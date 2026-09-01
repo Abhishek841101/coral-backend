@@ -20,7 +20,10 @@ const app = express();
 
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: [
+      "http://localhost:5173",
+      "https://coral-9fvtny4ts-abhishek841101s-projects.vercel.app",
+    ],
     credentials: true,
   })
 );
