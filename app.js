@@ -23,6 +23,8 @@ app.use(
     origin: [
       "http://localhost:5173",
       "https://coral-9fvtny4ts-abhishek841101s-projects.vercel.app",
+      "https://coral-pearl.vercel.app",
+      "https://coral-git-main-abhishek841101s-projects.vercel.app",
     ],
     credentials: true,
   })
