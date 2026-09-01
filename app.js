@@ -13,19 +13,27 @@ import bookingRoutes from "./routes/bookingRoutes.js";
 import enquiryRoutes from "./routes/enquiryRoutes.js";
 
 const app = express();
+app.set("trust proxy", 1);
 
 /* =====================================================
    CORS
 ===================================================== */
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://coral-pearl.vercel.app",
+  "https://coral-9fvtny4ts-abhishek841101s-projects.vercel.app",
+  "https://coral-git-main-abhishek841101s-projects.vercel.app",
+];
 
 app.use(
   cors({
-    origin: [
-      "http://localhost:5173",
-      "https://coral-9fvtny4ts-abhishek841101s-projects.vercel.app",
-      "https://coral-pearl.vercel.app",
-      "https://coral-git-main-abhishek841101s-projects.vercel.app",
-    ],
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
   })
 );
