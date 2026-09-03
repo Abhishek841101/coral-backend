@@ -145,11 +145,9 @@ export const adminLogout = async (req, res) => {
   try {
     res.clearCookie("coral_admin_token", {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite:
-        process.env.NODE_ENV === "production"
-          ? "none"
-          : "lax",
+      secure: true,
+      sameSite: "none",
+      path: "/",
     });
 
     return res.status(200).json({
