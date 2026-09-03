@@ -3,11 +3,51 @@ import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 
 /* =====================================================
+   DEBUG
+===================================================== */
+
+console.log(
+  "=================================================="
+);
+
+console.log(
+  "[AUTH CONTROLLER] authController.js LOADED"
+);
+
+console.log(
+  "[AUTH CONTROLLER] JWT_SECRET exists:",
+  Boolean(process.env.JWT_SECRET)
+);
+
+console.log(
+  "[AUTH CONTROLLER] NODE_ENV:",
+  process.env.NODE_ENV
+);
+
+console.log(
+  "=================================================="
+);
+
+/* =====================================================
    CREATE JWT
 ===================================================== */
 
 const createToken = (user) => {
-  return jwt.sign(
+  console.log(
+    "[AUTH TOKEN] Creating normal user JWT"
+  );
+
+  console.log(
+    "[AUTH TOKEN] User ID:",
+    user._id
+  );
+
+  console.log(
+    "[AUTH TOKEN] User role:",
+    user.role
+  );
+
+  const token = jwt.sign(
     {
       id: user._id,
       role: user.role,
@@ -17,6 +57,13 @@ const createToken = (user) => {
       expiresIn: "7d",
     }
   );
+
+  console.log(
+    "[AUTH TOKEN] Token created:",
+    Boolean(token)
+  );
+
+  return token;
 };
 
 /* =====================================================
@@ -25,18 +72,59 @@ const createToken = (user) => {
 
 const cookieOptions = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-  maxAge: 7 * 24 * 60 * 60 * 1000,
+  secure:
+    process.env.NODE_ENV === "production",
+
+  sameSite:
+    process.env.NODE_ENV === "production"
+      ? "none"
+      : "lax",
+
+  maxAge:
+    7 *
+    24 *
+    60 *
+    60 *
+    1000,
 };
+
+console.log(
+  "[AUTH COOKIE] Cookie options:",
+  {
+    httpOnly:
+      cookieOptions.httpOnly,
+
+    secure:
+      cookieOptions.secure,
+
+    sameSite:
+      cookieOptions.sameSite,
+
+    maxAge:
+      cookieOptions.maxAge,
+  }
+);
 
 /* =====================================================
    REGISTER USER
    POST /api/auth/register
 ===================================================== */
 
-export const register = async (req, res) => {
+export const register = async (
+  req,
+  res
+) => {
+
+  console.log(
+    "=================================================="
+  );
+
+  console.log(
+    "[AUTH REGISTER] START"
+  );
+
   try {
+
     const {
       name,
       email,
@@ -44,60 +132,198 @@ export const register = async (req, res) => {
       password,
     } = req.body;
 
-    /* Validation */
+    console.log(
+      "[AUTH REGISTER] Request received:",
+      {
+        name,
+        email,
+        phone,
+        passwordPresent:
+          Boolean(password),
+      }
+    );
 
-    if (!name || !email || !password) {
+    /* =================================================
+       VALIDATION
+    ================================================= */
+
+    if (
+      !name ||
+      !email ||
+      !password
+    ) {
+
+      console.error(
+        "[AUTH REGISTER] Validation failed"
+      );
+
       return res.status(400).json({
         success: false,
-        message: "Name, email and password are required.",
+        message:
+          "Name, email and password are required.",
       });
     }
 
-    if (password.length < 6) {
+    if (
+      password.length < 6
+    ) {
+
+      console.error(
+        "[AUTH REGISTER] Password too short"
+      );
+
       return res.status(400).json({
         success: false,
-        message: "Password must be at least 6 characters.",
+        message:
+          "Password must be at least 6 characters.",
       });
     }
 
-    /* Check existing user */
+    /* =================================================
+       NORMALIZE EMAIL
+    ================================================= */
 
-    const existingUser = await User.findOne({
-      email: email.toLowerCase().trim(),
-    });
+    const normalizedEmail =
+      email
+        .toLowerCase()
+        .trim();
+
+    console.log(
+      "[AUTH REGISTER] Normalized email:",
+      normalizedEmail
+    );
+
+    /* =================================================
+       CHECK EXISTING USER
+    ================================================= */
+
+    console.log(
+      "[AUTH REGISTER] Checking existing account..."
+    );
+
+    const existingUser =
+      await User.findOne({
+        email:
+          normalizedEmail,
+      });
+
+    console.log(
+      "[AUTH REGISTER] Existing account:",
+      Boolean(existingUser)
+    );
 
     if (existingUser) {
+
+      console.warn(
+        "[AUTH REGISTER] Email already exists"
+      );
+
       return res.status(409).json({
         success: false,
-        message: "An account with this email already exists.",
+        message:
+          "An account with this email already exists.",
       });
     }
 
-    /* Hash password */
+    /* =================================================
+       HASH PASSWORD
+    ================================================= */
 
-    const hashedPassword = await bcrypt.hash(password, 12);
+    console.log(
+      "[AUTH REGISTER] Hashing password..."
+    );
 
-    /* Create user */
+    const hashedPassword =
+      await bcrypt.hash(
+        password,
+        12
+      );
 
-    const user = await User.create({
-      name: name.trim(),
-      email: email.toLowerCase().trim(),
-      phone: phone?.trim() || "",
-      password: hashedPassword,
-      role: "user",
-    });
+    console.log(
+      "[AUTH REGISTER] Password hashed successfully"
+    );
 
-    /* Create JWT */
+    /* =================================================
+       CREATE USER
+    ================================================= */
 
-    const token = createToken(user);
+    console.log(
+      "[AUTH REGISTER] Creating normal USER account"
+    );
 
-    /* Set cookie */
+    const user =
+      await User.create({
+        name:
+          name.trim(),
 
-    res.cookie("coral_token", token, cookieOptions);
+        email:
+          normalizedEmail,
+
+        phone:
+          phone?.trim() || "",
+
+        password:
+          hashedPassword,
+
+        /* IMPORTANT:
+           Registration ALWAYS creates USER */
+        role: "user",
+      });
+
+    console.log(
+      "[AUTH REGISTER] User created:",
+      {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      }
+    );
+
+    /* =================================================
+       CREATE JWT
+    ================================================= */
+
+    const token =
+      createToken(user);
+
+    console.log(
+      "[AUTH REGISTER] Token created:",
+      Boolean(token)
+    );
+
+    /* =================================================
+       SET COOKIE
+    ================================================= */
+
+    res.cookie(
+      "coral_token",
+      token,
+      cookieOptions
+    );
+
+    console.log(
+      "[AUTH REGISTER] coral_token cookie set"
+    );
+
+    /* =================================================
+       RESPONSE
+    ================================================= */
+
+    console.log(
+      "[AUTH REGISTER] SUCCESS"
+    );
+
+    console.log(
+      "=================================================="
+    );
 
     return res.status(201).json({
       success: true,
-      message: "Account created successfully.",
+
+      message:
+        "Account created successfully.",
+
       user: {
         id: user._id,
         name: user.name,
@@ -107,12 +333,23 @@ export const register = async (req, res) => {
         avatar: user.avatar,
       },
     });
+
   } catch (error) {
-    console.error("Register error:", error);
+
+    console.error(
+      "[AUTH REGISTER] ERROR:",
+      error
+    );
+
+    console.error(
+      "[AUTH REGISTER] Error message:",
+      error?.message
+    );
 
     return res.status(500).json({
       success: false,
-      message: "Unable to create account.",
+      message:
+        "Unable to create account.",
     });
   }
 };
@@ -120,92 +357,296 @@ export const register = async (req, res) => {
 /* =====================================================
    LOGIN USER
    POST /api/auth/login
+
+   IMPORTANT:
+   ADMIN USERS ARE NOT ALLOWED HERE.
+
+   Admin must use:
+   POST /api/admin/login
 ===================================================== */
 
-export const login = async (req, res) => {
+export const login = async (
+  req,
+  res
+) => {
+
+  console.log(
+    "=================================================="
+  );
+
+  console.log(
+    "[AUTH LOGIN] START"
+  );
+
   try {
+
     const {
       email,
       password,
     } = req.body;
 
-    /* Validation */
-
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "Email and password are required.",
-      });
-    }
-
-    /* Find user + password */
-
-    const user = await User.findOne({
-      email: email.toLowerCase().trim(),
-    }).select("+password");
-
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid email or password.",
-      });
-    }
-
-    /* Active check */
-
-    if (!user.isActive) {
-      return res.status(403).json({
-        success: false,
-        message: "Your account has been disabled.",
-      });
-    }
-
-    /* Compare password */
-
-    const passwordMatch = await bcrypt.compare(
-      password,
-      user.password
+    console.log(
+      "[AUTH LOGIN] Email received:",
+      email
     );
 
-    if (!passwordMatch) {
-      return res.status(401).json({
+    console.log(
+      "[AUTH LOGIN] Password present:",
+      Boolean(password)
+    );
+
+    /* =================================================
+       VALIDATION
+    ================================================= */
+
+    if (
+      !email ||
+      !password
+    ) {
+
+      console.error(
+        "[AUTH LOGIN] Email/password missing"
+      );
+
+      return res.status(400).json({
         success: false,
-        message: "Invalid email or password.",
+        message:
+          "Email and password are required.",
       });
     }
 
-    /* Update last login */
+    /* =================================================
+       NORMALIZE EMAIL
+    ================================================= */
 
-    user.lastLogin = new Date();
+    const normalizedEmail =
+      email
+        .toLowerCase()
+        .trim();
 
-    await user.save();
+    console.log(
+      "[AUTH LOGIN] Normalized email:",
+      normalizedEmail
+    );
 
-    /* Create JWT */
+    /* =================================================
+       FIND USER
 
-    const token = createToken(user);
+       VERY IMPORTANT:
+       role: "user"
 
-    /* Set cookie */
+       This prevents admin from using
+       normal user login.
+    ================================================= */
 
-    res.cookie("coral_token", token, cookieOptions);
+    console.log(
+      "[AUTH LOGIN] Searching ONLY for normal user..."
+    );
 
-    return res.status(200).json({
-      success: true,
-      message: "Login successful.",
-      user: {
+    const user =
+      await User.findOne({
+        email:
+          normalizedEmail,
+
+        role: "user",
+      }).select("+password");
+
+    console.log(
+      "[AUTH LOGIN] Normal user found:",
+      Boolean(user)
+    );
+
+    /* =================================================
+       IF USER NOT FOUND
+
+       This also covers admin accounts.
+    ================================================= */
+
+    if (!user) {
+
+      console.warn(
+        "[AUTH LOGIN] Normal user not found"
+      );
+
+      console.warn(
+        "[AUTH LOGIN] If this is an admin account, it MUST use /api/admin/login"
+      );
+
+      return res.status(401).json({
+        success: false,
+        message:
+          "Invalid email or password.",
+      });
+    }
+
+    console.log(
+      "[AUTH LOGIN] User details:",
+      {
         id: user._id,
         name: user.name,
         email: user.email,
-        phone: user.phone,
         role: user.role,
-        avatar: user.avatar,
-      },
+        isActive:
+          user.isActive,
+      }
+    );
+
+    /* =================================================
+       ACTIVE CHECK
+    ================================================= */
+
+    if (
+      !user.isActive
+    ) {
+
+      console.warn(
+        "[AUTH LOGIN] User account disabled"
+      );
+
+      return res.status(403).json({
+        success: false,
+        message:
+          "Your account has been disabled.",
+      });
+    }
+
+    console.log(
+      "[AUTH LOGIN] User is active"
+    );
+
+    /* =================================================
+       PASSWORD CHECK
+    ================================================= */
+
+    console.log(
+      "[AUTH LOGIN] Comparing password..."
+    );
+
+    const passwordMatch =
+      await bcrypt.compare(
+        password,
+        user.password
+      );
+
+    console.log(
+      "[AUTH LOGIN] Password match:",
+      passwordMatch
+    );
+
+    if (
+      !passwordMatch
+    ) {
+
+      console.warn(
+        "[AUTH LOGIN] Password incorrect"
+      );
+
+      return res.status(401).json({
+        success: false,
+        message:
+          "Invalid email or password.",
+      });
+    }
+
+    /* =================================================
+       UPDATE LAST LOGIN
+    ================================================= */
+
+    console.log(
+      "[AUTH LOGIN] Updating lastLogin..."
+    );
+
+    user.lastLogin =
+      new Date();
+
+    await user.save();
+
+    console.log(
+      "[AUTH LOGIN] lastLogin updated"
+    );
+
+    /* =================================================
+       CREATE JWT
+    ================================================= */
+
+    console.log(
+      "[AUTH LOGIN] Creating normal user token..."
+    );
+
+    const token =
+      createToken(user);
+
+    console.log(
+      "[AUTH LOGIN] Token created:",
+      Boolean(token)
+    );
+
+    /* =================================================
+       SET COOKIE
+    ================================================= */
+
+    res.cookie(
+      "coral_token",
+      token,
+      cookieOptions
+    );
+
+    console.log(
+      "[AUTH LOGIN] coral_token cookie set"
+    );
+
+    /* =================================================
+       RESPONSE
+    ================================================= */
+
+    const responseUser = {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      avatar: user.avatar,
+    };
+
+    console.log(
+      "[AUTH LOGIN] Response user:",
+      responseUser
+    );
+
+    console.log(
+      "[AUTH LOGIN] SUCCESS - NORMAL USER"
+    );
+
+    console.log(
+      "=================================================="
+    );
+
+    return res.status(200).json({
+      success: true,
+
+      message:
+        "Login successful.",
+
+      user:
+        responseUser,
     });
+
   } catch (error) {
-    console.error("Login error:", error);
+
+    console.error(
+      "[AUTH LOGIN] ERROR:",
+      error
+    );
+
+    console.error(
+      "[AUTH LOGIN] Error message:",
+      error?.message
+    );
 
     return res.status(500).json({
       success: false,
-      message: "Unable to login.",
+      message:
+        "Unable to login.",
     });
   }
 };
@@ -215,19 +656,88 @@ export const login = async (req, res) => {
    GET /api/auth/me
 ===================================================== */
 
-export const getMe = async (req, res) => {
-  try {
-    const user = await User.findById(req.user.id);
+export const getMe = async (
+  req,
+  res
+) => {
 
-    if (!user) {
-      return res.status(404).json({
+  console.log(
+    "=================================================="
+  );
+
+  console.log(
+    "[AUTH ME] START"
+  );
+
+  try {
+
+    console.log(
+      "[AUTH ME] req.user:",
+      req.user
+    );
+
+    if (
+      !req.user?.id
+    ) {
+
+      console.error(
+        "[AUTH ME] req.user.id missing"
+      );
+
+      return res.status(401).json({
         success: false,
-        message: "User not found.",
+        message:
+          "Authentication required.",
       });
     }
 
+    console.log(
+      "[AUTH ME] Searching user:",
+      req.user.id
+    );
+
+    const user =
+      await User.findById(
+        req.user.id
+      );
+
+    console.log(
+      "[AUTH ME] User found:",
+      Boolean(user)
+    );
+
+    if (!user) {
+
+      console.error(
+        "[AUTH ME] User not found"
+      );
+
+      return res.status(404).json({
+        success: false,
+        message:
+          "User not found.",
+      });
+    }
+
+    console.log(
+      "[AUTH ME] User:",
+      {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isActive:
+          user.isActive,
+      }
+    );
+
+    console.log(
+      "[AUTH ME] SUCCESS"
+    );
+
     return res.status(200).json({
       success: true,
+
       user: {
         id: user._id,
         name: user.name,
@@ -235,17 +745,26 @@ export const getMe = async (req, res) => {
         phone: user.phone,
         role: user.role,
         avatar: user.avatar,
-        isActive: user.isActive,
-        lastLogin: user.lastLogin,
-        createdAt: user.createdAt,
+        isActive:
+          user.isActive,
+        lastLogin:
+          user.lastLogin,
+        createdAt:
+          user.createdAt,
       },
     });
+
   } catch (error) {
-    console.error("Get me error:", error);
+
+    console.error(
+      "[AUTH ME] ERROR:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
-      message: "Unable to fetch user.",
+      message:
+        "Unable to fetch user.",
     });
   }
 };
@@ -255,27 +774,71 @@ export const getMe = async (req, res) => {
    POST /api/auth/logout
 ===================================================== */
 
-export const logout = async (req, res) => {
+export const logout = async (
+  req,
+  res
+) => {
+
+  console.log(
+    "=================================================="
+  );
+
+  console.log(
+    "[AUTH LOGOUT] START"
+  );
+
   try {
-    res.clearCookie("coral_token", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite:
-        process.env.NODE_ENV === "production"
-          ? "none"
-          : "lax",
-    });
+
+    console.log(
+      "[AUTH LOGOUT] Clearing coral_token cookie"
+    );
+
+    res.clearCookie(
+      "coral_token",
+      {
+        httpOnly: true,
+
+        secure:
+          process.env.NODE_ENV ===
+          "production",
+
+        sameSite:
+          process.env.NODE_ENV ===
+          "production"
+            ? "none"
+            : "lax",
+      }
+    );
+
+    console.log(
+      "[AUTH LOGOUT] Cookie cleared"
+    );
+
+    console.log(
+      "[AUTH LOGOUT] SUCCESS"
+    );
+
+    console.log(
+      "=================================================="
+    );
 
     return res.status(200).json({
       success: true,
-      message: "Logged out successfully.",
+      message:
+        "Logged out successfully.",
     });
+
   } catch (error) {
-    console.error("Logout error:", error);
+
+    console.error(
+      "[AUTH LOGOUT] ERROR:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
-      message: "Unable to logout.",
+      message:
+        "Unable to logout.",
     });
   }
 };
