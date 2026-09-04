@@ -48,7 +48,6 @@
 
 
 
-
 import express from "express";
 
 import {
@@ -56,6 +55,7 @@ import {
   getMyBookings,
   getBookingById,
   cancelBooking,
+  payBooking,
 } from "../controllers/bookingController.js";
 
 import { protect } from "../middleware/authMiddleware.js";
@@ -64,7 +64,6 @@ const router = express.Router();
 
 /* =====================================================
    CUSTOMER AUTHENTICATION
-   All booking routes require logged-in customer
 ===================================================== */
 
 router.use(protect);
@@ -74,40 +73,35 @@ router.use(protect);
    POST /api/bookings
 ===================================================== */
 
-router.post(
-  "/",
-  createBooking
-);
+router.post("/", createBooking);
 
 /* =====================================================
    GET MY BOOKINGS
    GET /api/bookings/my
 ===================================================== */
 
-router.get(
-  "/my",
-  getMyBookings
-);
+router.get("/my", getMyBookings);
 
 /* =====================================================
    GET SINGLE BOOKING
    GET /api/bookings/:id
 ===================================================== */
 
-router.get(
-  "/:id",
-  getBookingById
-);
+router.get("/:id", getBookingById);
+
+/* =====================================================
+   PAY BOOKING
+   PATCH /api/bookings/:id/pay
+===================================================== */
+
+router.patch("/:id/pay", payBooking);
 
 /* =====================================================
    CANCEL BOOKING
    PATCH /api/bookings/:id/cancel
 ===================================================== */
 
-router.patch(
-  "/:id/cancel",
-  cancelBooking
-);
+router.patch("/:id/cancel", cancelBooking);
 
 export default router;
 

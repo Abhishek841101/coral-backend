@@ -1113,3 +1113,100 @@ export const cancelBooking = async (
   }
 };
 
+/* =====================================================
+   PAY BOOKING
+   PATCH /api/bookings/:id/pay
+===================================================== */
+
+export const payBooking = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const bookingId = req.params.id;
+
+    if (!mongoose.Types.ObjectId.isValid(bookingId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid booking ID.",
+      });
+    }
+
+    const booking = await Booking.findOne({
+      _id: bookingId,
+      user: userId,
+    });
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found.",
+      });
+    }
+
+    if (booking.status === "cancelled") {
+      return res.status(400).json({
+        success: false,
+        message: "Cancelled booking cannot be paid.",
+      });
+    }
+
+    if (booking.status === "rejected") {
+      return res.status(400).json({
+        success: false,
+        message: "Rejected booking cannot be paid.",
+      });
+    }
+
+    if (booking.paymentStatus === "paid") {
+      return res.status(400).json({
+        success: false,
+        message: "Payment has already been completed.",
+        booking,
+      });
+    }
+
+    const paymentMethod =
+      req.body?.paymentMethod === "online"
+        ? "online"
+        : "online";
+
+    const paymentId =
+      `CORAL-${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2, 8)
+        .toUpperCase()}`;
+
+    booking.paymentStatus = "paid";
+    booking.paymentMethod = paymentMethod;
+    booking.paymentId = paymentId;
+    booking.status = "confirmed";
+    booking.confirmedAt = new Date();
+
+    await booking.save();
+
+    const updatedBooking = await Booking.findById(
+      booking._id
+    )
+      .populate(
+        "property",
+        "title description propertyType city locality address rent rentPeriod guests amenities rules images"
+      )
+      .populate(
+        "user",
+        "name email phone avatar"
+      );
+
+    return res.status(200).json({
+      success: true,
+      message: "Payment successful. Booking confirmed.",
+      booking: updatedBooking,
+    });
+  } catch (error) {
+    console.error("Pay booking error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to process payment.",
+    });
+  }
+};
+
