@@ -22,12 +22,6 @@ const router = express.Router();
    PUBLIC PROPERTIES
 ===================================================== */
 
-/*
-   GET /api/properties
-
-   Public property listing.
-*/
-
 router.get(
   "/",
   getProperties
@@ -38,12 +32,6 @@ router.get(
    MY PROPERTIES
 ===================================================== */
 
-/*
-   GET /api/properties/my
-
-   Normal logged-in user properties.
-*/
-
 router.get(
   "/my",
   protect,
@@ -52,19 +40,8 @@ router.get(
 
 
 /* =====================================================
-   CREATE PROPERTY
+   CREATE PROPERTY - ADMIN
 ===================================================== */
-
-/*
-   POST /api/properties
-
-   Admin authentication required.
-
-   FormData field:
-   images
-
-   Maximum 10 images.
-*/
 
 router.post(
   "/",
@@ -78,12 +55,6 @@ router.post(
    SINGLE PROPERTY
 ===================================================== */
 
-/*
-   GET /api/properties/:id
-
-   Public single property.
-*/
-
 router.get(
   "/:id",
   getPropertyById
@@ -91,16 +62,8 @@ router.get(
 
 
 /* =====================================================
-   UPDATE PROPERTY
+   UPDATE PROPERTY - ADMIN
 ===================================================== */
-
-/*
-   PUT /api/properties/:id
-
-   Admin authentication required.
-
-   Maximum 10 images.
-*/
 
 router.put(
   "/:id",
@@ -111,20 +74,13 @@ router.put(
 
 
 /* =====================================================
-   DELETE PROPERTY
+   DELETE PROPERTY - ADMIN
 ===================================================== */
-
-/*
-   DELETE /api/properties/:id
-
-   Admin authentication required.
-*/
 
 router.delete(
   "/:id",
   protectAdmin,
   deleteProperty
 );
-
 
 export default router;
