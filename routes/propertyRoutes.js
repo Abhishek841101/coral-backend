@@ -9,7 +9,10 @@ import {
   getMyProperties,
 } from "../controllers/propertyController.js";
 
-import { protect } from "../middleware/authMiddleware.js";
+import {
+  protect,
+  protectAdmin,
+} from "../middleware/authMiddleware.js";
 
 import upload from "../middleware/uploadMiddleware.js";
 
@@ -21,6 +24,8 @@ const router = express.Router();
 
 /*
    GET /api/properties
+
+   Public property listing.
 */
 
 router.get(
@@ -34,8 +39,9 @@ router.get(
 ===================================================== */
 
 /*
-   IMPORTANT:
-   /my ko /:id se pehle rakhna hai.
+   GET /api/properties/my
+
+   Normal logged-in user properties.
 */
 
 router.get(
@@ -52,8 +58,9 @@ router.get(
 /*
    POST /api/properties
 
-   FormData field:
+   Admin authentication required.
 
+   FormData field:
    images
 
    Maximum 10 images.
@@ -61,7 +68,7 @@ router.get(
 
 router.post(
   "/",
-  protect,
+  protectAdmin,
   upload.array("images", 10),
   createProperty
 );
@@ -73,6 +80,8 @@ router.post(
 
 /*
    GET /api/properties/:id
+
+   Public single property.
 */
 
 router.get(
@@ -85,9 +94,17 @@ router.get(
    UPDATE PROPERTY
 ===================================================== */
 
+/*
+   PUT /api/properties/:id
+
+   Admin authentication required.
+
+   Maximum 10 images.
+*/
+
 router.put(
   "/:id",
-  protect,
+  protectAdmin,
   upload.array("images", 10),
   updateProperty
 );
@@ -97,10 +114,17 @@ router.put(
    DELETE PROPERTY
 ===================================================== */
 
+/*
+   DELETE /api/properties/:id
+
+   Admin authentication required.
+*/
+
 router.delete(
   "/:id",
-  protect,
+  protectAdmin,
   deleteProperty
 );
+
 
 export default router;
