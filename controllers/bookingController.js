@@ -471,10 +471,16 @@
 
 
 
-
 import mongoose from "mongoose";
 import Booking from "../models/Booking.js";
 import Property from "../models/Property.js";
+
+/* =====================================================
+   BOOKING RULES
+===================================================== */
+
+// One room can accommodate maximum 3 guests.
+const MAX_GUESTS_PER_ROOM = 3;
 
 /* =====================================================
    HELPERS
@@ -566,7 +572,7 @@ export const createBooking = async (req, res) => {
       });
     }
 
-    /* ================= GUESTS ================= */
+    /* ================= GUESTS & ROOMS ================= */
 
     const guestCount = Number(guests);
     const roomCount = Number(rooms || 1);
@@ -588,6 +594,24 @@ export const createBooking = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Rooms must be at least 1.",
+      });
+    }
+
+    /* =================================================
+       GUEST CAPACITY
+
+       1 room  = maximum 3 guests
+       2 rooms = maximum 6 guests
+       3 rooms = maximum 9 guests
+    ================================================= */
+
+    const maximumGuests =
+      MAX_GUESTS_PER_ROOM * roomCount;
+
+    if (guestCount > maximumGuests) {
+      return res.status(400).json({
+        success: false,
+        message: `Maximum ${maximumGuests} guests are allowed for ${roomCount} room(s).`,
       });
     }
 
@@ -659,24 +683,6 @@ export const createBooking = async (req, res) => {
         success: false,
         message:
           "Property is not available for booking.",
-      });
-    }
-
-    /* ================= GUEST CAPACITY ================= */
-
-    const propertyGuests =
-      Number(property.guests || 0);
-
-    if (
-      propertyGuests > 0 &&
-      guestCount >
-        propertyGuests * roomCount
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: `Maximum ${
-          propertyGuests * roomCount
-        } guests are allowed for ${roomCount} room(s).`,
       });
     }
 
@@ -1118,54 +1124,91 @@ export const cancelBooking = async (
    PATCH /api/bookings/:id/pay
 ===================================================== */
 
-export const payBooking = async (req, res) => {
+export const payBooking = async (
+  req,
+  res
+) => {
   try {
-    const userId = req.user?._id || req.user?.id;
-    const bookingId = req.params.id;
+    const userId =
+      req.user?._id ||
+      req.user?.id;
 
-    if (!mongoose.Types.ObjectId.isValid(bookingId)) {
-      return res.status(400).json({
+    const bookingId =
+      req.params.id;
+
+    if (!userId) {
+      return res.status(401).json({
         success: false,
-        message: "Invalid booking ID.",
+        message:
+          "Authentication required.",
       });
     }
 
-    const booking = await Booking.findOne({
-      _id: bookingId,
-      user: userId,
-    });
+    if (
+      !mongoose.Types.ObjectId.isValid(
+        bookingId
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid booking ID.",
+      });
+    }
+
+    const booking =
+      await Booking.findOne({
+        _id: bookingId,
+        user: userId,
+      });
 
     if (!booking) {
       return res.status(404).json({
         success: false,
-        message: "Booking not found.",
+        message:
+          "Booking not found.",
       });
     }
 
-    if (booking.status === "cancelled") {
+    if (
+      booking.status ===
+      "cancelled"
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Cancelled booking cannot be paid.",
+        message:
+          "Cancelled booking cannot be paid.",
       });
     }
 
-    if (booking.status === "rejected") {
+    if (
+      booking.status ===
+      "rejected"
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Rejected booking cannot be paid.",
+        message:
+          "Rejected booking cannot be paid.",
       });
     }
 
-    if (booking.paymentStatus === "paid") {
+    if (
+      booking.paymentStatus ===
+      "paid"
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Payment has already been completed.",
+        message:
+          "Payment has already been completed.",
         booking,
       });
     }
 
+    /* ================= PAYMENT ================= */
+
     const paymentMethod =
-      req.body?.paymentMethod === "online"
+      req.body?.paymentMethod ===
+      "online"
         ? "online"
         : "online";
 
@@ -1175,37 +1218,53 @@ export const payBooking = async (req, res) => {
         .slice(2, 8)
         .toUpperCase()}`;
 
-    booking.paymentStatus = "paid";
-    booking.paymentMethod = paymentMethod;
-    booking.paymentId = paymentId;
-    booking.status = "confirmed";
-    booking.confirmedAt = new Date();
+    booking.paymentStatus =
+      "paid";
+
+    booking.paymentMethod =
+      paymentMethod;
+
+    booking.paymentId =
+      paymentId;
+
+    booking.status =
+      "confirmed";
+
+    booking.confirmedAt =
+      new Date();
 
     await booking.save();
 
-    const updatedBooking = await Booking.findById(
-      booking._id
-    )
-      .populate(
-        "property",
-        "title description propertyType city locality address rent rentPeriod guests amenities rules images"
+    const updatedBooking =
+      await Booking.findById(
+        booking._id
       )
-      .populate(
-        "user",
-        "name email phone avatar"
-      );
+        .populate(
+          "property",
+          "title description propertyType city locality address rent rentPeriod guests amenities rules images"
+        )
+        .populate(
+          "user",
+          "name email phone avatar"
+        );
 
     return res.status(200).json({
       success: true,
-      message: "Payment successful. Booking confirmed.",
-      booking: updatedBooking,
+      message:
+        "Payment successful. Booking confirmed.",
+      booking:
+        updatedBooking,
     });
   } catch (error) {
-    console.error("Pay booking error:", error);
+    console.error(
+      "Pay booking error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
-      message: "Unable to process payment.",
+      message:
+        "Unable to process payment.",
     });
   }
 };
