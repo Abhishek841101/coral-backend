@@ -1,53 +1,14 @@
+
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
-
-/* =====================================================
-   DEBUG
-===================================================== */
-
-console.log(
-  "=================================================="
-);
-
-console.log(
-  "[AUTH CONTROLLER] authController.js LOADED"
-);
-
-console.log(
-  "[AUTH CONTROLLER] JWT_SECRET exists:",
-  Boolean(process.env.JWT_SECRET)
-);
-
-console.log(
-  "[AUTH CONTROLLER] NODE_ENV:",
-  process.env.NODE_ENV
-);
-
-console.log(
-  "=================================================="
-);
 
 /* =====================================================
    CREATE JWT
 ===================================================== */
 
 const createToken = (user) => {
-  console.log(
-    "[AUTH TOKEN] Creating normal user JWT"
-  );
-
-  console.log(
-    "[AUTH TOKEN] User ID:",
-    user._id
-  );
-
-  console.log(
-    "[AUTH TOKEN] User role:",
-    user.role
-  );
-
-  const token = jwt.sign(
+  return jwt.sign(
     {
       id: user._id,
       role: user.role,
@@ -57,74 +18,37 @@ const createToken = (user) => {
       expiresIn: "7d",
     }
   );
-
-  console.log(
-    "[AUTH TOKEN] Token created:",
-    Boolean(token)
-  );
-
-  return token;
 };
 
 /* =====================================================
    COOKIE OPTIONS
+
+   IMPORTANT:
+   Frontend:
+   https://coral-pearl.vercel.app
+
+   Backend:
+   https://coral-backend-ozif.onrender.com
+
+   These are different origins, so production requires:
+   secure: true
+   sameSite: "none"
 ===================================================== */
 
 const cookieOptions = {
   httpOnly: true,
-  secure:
-    process.env.NODE_ENV === "production",
-
-  sameSite:
-    process.env.NODE_ENV === "production"
-      ? "none"
-      : "lax",
-
-  maxAge:
-    7 *
-    24 *
-    60 *
-    60 *
-    1000,
+  secure: true,
+  sameSite: "none",
+  maxAge: 7 * 24 * 60 * 60 * 1000,
 };
-
-console.log(
-  "[AUTH COOKIE] Cookie options:",
-  {
-    httpOnly:
-      cookieOptions.httpOnly,
-
-    secure:
-      cookieOptions.secure,
-
-    sameSite:
-      cookieOptions.sameSite,
-
-    maxAge:
-      cookieOptions.maxAge,
-  }
-);
 
 /* =====================================================
    REGISTER USER
    POST /api/auth/register
 ===================================================== */
 
-export const register = async (
-  req,
-  res
-) => {
-
-  console.log(
-    "=================================================="
-  );
-
-  console.log(
-    "[AUTH REGISTER] START"
-  );
-
+export const register = async (req, res) => {
   try {
-
     const {
       name,
       email,
@@ -132,31 +56,11 @@ export const register = async (
       password,
     } = req.body;
 
-    console.log(
-      "[AUTH REGISTER] Request received:",
-      {
-        name,
-        email,
-        phone,
-        passwordPresent:
-          Boolean(password),
-      }
-    );
-
     /* =================================================
        VALIDATION
     ================================================= */
 
-    if (
-      !name ||
-      !email ||
-      !password
-    ) {
-
-      console.error(
-        "[AUTH REGISTER] Validation failed"
-      );
-
+    if (!name || !email || !password) {
       return res.status(400).json({
         success: false,
         message:
@@ -164,14 +68,7 @@ export const register = async (
       });
     }
 
-    if (
-      password.length < 6
-    ) {
-
-      console.error(
-        "[AUTH REGISTER] Password too short"
-      );
-
+    if (password.length < 6) {
       return res.status(400).json({
         success: false,
         message:
@@ -183,41 +80,19 @@ export const register = async (
        NORMALIZE EMAIL
     ================================================= */
 
-    const normalizedEmail =
-      email
-        .toLowerCase()
-        .trim();
-
-    console.log(
-      "[AUTH REGISTER] Normalized email:",
-      normalizedEmail
-    );
+    const normalizedEmail = email
+      .toLowerCase()
+      .trim();
 
     /* =================================================
        CHECK EXISTING USER
     ================================================= */
 
-    console.log(
-      "[AUTH REGISTER] Checking existing account..."
-    );
-
-    const existingUser =
-      await User.findOne({
-        email:
-          normalizedEmail,
-      });
-
-    console.log(
-      "[AUTH REGISTER] Existing account:",
-      Boolean(existingUser)
-    );
+    const existingUser = await User.findOne({
+      email: normalizedEmail,
+    });
 
     if (existingUser) {
-
-      console.warn(
-        "[AUTH REGISTER] Email already exists"
-      );
-
       return res.status(409).json({
         success: false,
         message:
@@ -229,71 +104,33 @@ export const register = async (
        HASH PASSWORD
     ================================================= */
 
-    console.log(
-      "[AUTH REGISTER] Hashing password..."
-    );
-
-    const hashedPassword =
-      await bcrypt.hash(
-        password,
-        12
-      );
-
-    console.log(
-      "[AUTH REGISTER] Password hashed successfully"
+    const hashedPassword = await bcrypt.hash(
+      password,
+      12
     );
 
     /* =================================================
        CREATE USER
+
+       Registration ALWAYS creates normal USER.
     ================================================= */
 
-    console.log(
-      "[AUTH REGISTER] Creating normal USER account"
-    );
-
-    const user =
-      await User.create({
-        name:
-          name.trim(),
-
-        email:
-          normalizedEmail,
-
-        phone:
-          phone?.trim() || "",
-
-        password:
-          hashedPassword,
-
-        /* IMPORTANT:
-           Registration ALWAYS creates USER */
-        role: "user",
-      });
-
-    console.log(
-      "[AUTH REGISTER] User created:",
-      {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      }
-    );
+    const user = await User.create({
+      name: name.trim(),
+      email: normalizedEmail,
+      phone: phone?.trim() || "",
+      password: hashedPassword,
+      role: "user",
+    });
 
     /* =================================================
        CREATE JWT
     ================================================= */
 
-    const token =
-      createToken(user);
-
-    console.log(
-      "[AUTH REGISTER] Token created:",
-      Boolean(token)
-    );
+    const token = createToken(user);
 
     /* =================================================
-       SET COOKIE
+       SET AUTH COOKIE
     ================================================= */
 
     res.cookie(
@@ -302,28 +139,14 @@ export const register = async (
       cookieOptions
     );
 
-    console.log(
-      "[AUTH REGISTER] coral_token cookie set"
-    );
-
     /* =================================================
        RESPONSE
     ================================================= */
 
-    console.log(
-      "[AUTH REGISTER] SUCCESS"
-    );
-
-    console.log(
-      "=================================================="
-    );
-
     return res.status(201).json({
       success: true,
-
       message:
         "Account created successfully.",
-
       user: {
         id: user._id,
         name: user.name,
@@ -333,17 +156,10 @@ export const register = async (
         avatar: user.avatar,
       },
     });
-
   } catch (error) {
-
     console.error(
       "[AUTH REGISTER] ERROR:",
       error
-    );
-
-    console.error(
-      "[AUTH REGISTER] Error message:",
-      error?.message
     );
 
     return res.status(500).json({
@@ -365,49 +181,18 @@ export const register = async (
    POST /api/admin/login
 ===================================================== */
 
-export const login = async (
-  req,
-  res
-) => {
-
-  console.log(
-    "=================================================="
-  );
-
-  console.log(
-    "[AUTH LOGIN] START"
-  );
-
+export const login = async (req, res) => {
   try {
-
     const {
       email,
       password,
     } = req.body;
 
-    console.log(
-      "[AUTH LOGIN] Email received:",
-      email
-    );
-
-    console.log(
-      "[AUTH LOGIN] Password present:",
-      Boolean(password)
-    );
-
     /* =================================================
        VALIDATION
     ================================================= */
 
-    if (
-      !email ||
-      !password
-    ) {
-
-      console.error(
-        "[AUTH LOGIN] Email/password missing"
-      );
-
+    if (!email || !password) {
       return res.status(400).json({
         success: false,
         message:
@@ -419,59 +204,23 @@ export const login = async (
        NORMALIZE EMAIL
     ================================================= */
 
-    const normalizedEmail =
-      email
-        .toLowerCase()
-        .trim();
-
-    console.log(
-      "[AUTH LOGIN] Normalized email:",
-      normalizedEmail
-    );
+    const normalizedEmail = email
+      .toLowerCase()
+      .trim();
 
     /* =================================================
-       FIND USER
+       FIND NORMAL USER ONLY
 
-       VERY IMPORTANT:
-       role: "user"
-
-       This prevents admin from using
-       normal user login.
+       This prevents admin accounts from using
+       the normal customer login.
     ================================================= */
 
-    console.log(
-      "[AUTH LOGIN] Searching ONLY for normal user..."
-    );
-
-    const user =
-      await User.findOne({
-        email:
-          normalizedEmail,
-
-        role: "user",
-      }).select("+password");
-
-    console.log(
-      "[AUTH LOGIN] Normal user found:",
-      Boolean(user)
-    );
-
-    /* =================================================
-       IF USER NOT FOUND
-
-       This also covers admin accounts.
-    ================================================= */
+    const user = await User.findOne({
+      email: normalizedEmail,
+      role: "user",
+    }).select("+password");
 
     if (!user) {
-
-      console.warn(
-        "[AUTH LOGIN] Normal user not found"
-      );
-
-      console.warn(
-        "[AUTH LOGIN] If this is an admin account, it MUST use /api/admin/login"
-      );
-
       return res.status(401).json({
         success: false,
         message:
@@ -479,30 +228,11 @@ export const login = async (
       });
     }
 
-    console.log(
-      "[AUTH LOGIN] User details:",
-      {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        isActive:
-          user.isActive,
-      }
-    );
-
     /* =================================================
        ACTIVE CHECK
     ================================================= */
 
-    if (
-      !user.isActive
-    ) {
-
-      console.warn(
-        "[AUTH LOGIN] User account disabled"
-      );
-
+    if (!user.isActive) {
       return res.status(403).json({
         success: false,
         message:
@@ -510,17 +240,9 @@ export const login = async (
       });
     }
 
-    console.log(
-      "[AUTH LOGIN] User is active"
-    );
-
     /* =================================================
        PASSWORD CHECK
     ================================================= */
-
-    console.log(
-      "[AUTH LOGIN] Comparing password..."
-    );
 
     const passwordMatch =
       await bcrypt.compare(
@@ -528,19 +250,7 @@ export const login = async (
         user.password
       );
 
-    console.log(
-      "[AUTH LOGIN] Password match:",
-      passwordMatch
-    );
-
-    if (
-      !passwordMatch
-    ) {
-
-      console.warn(
-        "[AUTH LOGIN] Password incorrect"
-      );
-
+    if (!passwordMatch) {
       return res.status(401).json({
         success: false,
         message:
@@ -552,37 +262,20 @@ export const login = async (
        UPDATE LAST LOGIN
     ================================================= */
 
-    console.log(
-      "[AUTH LOGIN] Updating lastLogin..."
-    );
-
-    user.lastLogin =
-      new Date();
+    user.lastLogin = new Date();
 
     await user.save();
-
-    console.log(
-      "[AUTH LOGIN] lastLogin updated"
-    );
 
     /* =================================================
        CREATE JWT
     ================================================= */
 
-    console.log(
-      "[AUTH LOGIN] Creating normal user token..."
-    );
-
-    const token =
-      createToken(user);
-
-    console.log(
-      "[AUTH LOGIN] Token created:",
-      Boolean(token)
-    );
+    const token = createToken(user);
 
     /* =================================================
-       SET COOKIE
+       SET AUTH COOKIE
+
+       This is the important production fix.
     ================================================= */
 
     res.cookie(
@@ -591,12 +284,8 @@ export const login = async (
       cookieOptions
     );
 
-    console.log(
-      "[AUTH LOGIN] coral_token cookie set"
-    );
-
     /* =================================================
-       RESPONSE
+       RESPONSE USER
     ================================================= */
 
     const responseUser = {
@@ -608,39 +297,20 @@ export const login = async (
       avatar: user.avatar,
     };
 
-    console.log(
-      "[AUTH LOGIN] Response user:",
-      responseUser
-    );
-
-    console.log(
-      "[AUTH LOGIN] SUCCESS - NORMAL USER"
-    );
-
-    console.log(
-      "=================================================="
-    );
+    /* =================================================
+       RESPONSE
+    ================================================= */
 
     return res.status(200).json({
       success: true,
-
       message:
         "Login successful.",
-
-      user:
-        responseUser,
+      user: responseUser,
     });
-
   } catch (error) {
-
     console.error(
       "[AUTH LOGIN] ERROR:",
       error
-    );
-
-    console.error(
-      "[AUTH LOGIN] Error message:",
-      error?.message
     );
 
     return res.status(500).json({
@@ -656,34 +326,9 @@ export const login = async (
    GET /api/auth/me
 ===================================================== */
 
-export const getMe = async (
-  req,
-  res
-) => {
-
-  console.log(
-    "=================================================="
-  );
-
-  console.log(
-    "[AUTH ME] START"
-  );
-
+export const getMe = async (req, res) => {
   try {
-
-    console.log(
-      "[AUTH ME] req.user:",
-      req.user
-    );
-
-    if (
-      !req.user?.id
-    ) {
-
-      console.error(
-        "[AUTH ME] req.user.id missing"
-      );
-
+    if (!req.user?.id) {
       return res.status(401).json({
         success: false,
         message:
@@ -691,27 +336,11 @@ export const getMe = async (
       });
     }
 
-    console.log(
-      "[AUTH ME] Searching user:",
+    const user = await User.findById(
       req.user.id
     );
 
-    const user =
-      await User.findById(
-        req.user.id
-      );
-
-    console.log(
-      "[AUTH ME] User found:",
-      Boolean(user)
-    );
-
     if (!user) {
-
-      console.error(
-        "[AUTH ME] User not found"
-      );
-
       return res.status(404).json({
         success: false,
         message:
@@ -719,25 +348,8 @@ export const getMe = async (
       });
     }
 
-    console.log(
-      "[AUTH ME] User:",
-      {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        isActive:
-          user.isActive,
-      }
-    );
-
-    console.log(
-      "[AUTH ME] SUCCESS"
-    );
-
     return res.status(200).json({
       success: true,
-
       user: {
         id: user._id,
         name: user.name,
@@ -745,17 +357,12 @@ export const getMe = async (
         phone: user.phone,
         role: user.role,
         avatar: user.avatar,
-        isActive:
-          user.isActive,
-        lastLogin:
-          user.lastLogin,
-        createdAt:
-          user.createdAt,
+        isActive: user.isActive,
+        lastLogin: user.lastLogin,
+        createdAt: user.createdAt,
       },
     });
-
   } catch (error) {
-
     console.error(
       "[AUTH ME] ERROR:",
       error
@@ -774,52 +381,20 @@ export const getMe = async (
    POST /api/auth/logout
 ===================================================== */
 
-export const logout = async (
-  req,
-  res
-) => {
-
-  console.log(
-    "=================================================="
-  );
-
-  console.log(
-    "[AUTH LOGOUT] START"
-  );
-
+export const logout = async (req, res) => {
   try {
-
-    console.log(
-      "[AUTH LOGOUT] Clearing coral_token cookie"
-    );
+    /* =================================================
+       IMPORTANT:
+       clearCookie options must match cookie settings.
+    ================================================= */
 
     res.clearCookie(
       "coral_token",
       {
         httpOnly: true,
-
-        secure:
-          process.env.NODE_ENV ===
-          "production",
-
-        sameSite:
-          process.env.NODE_ENV ===
-          "production"
-            ? "none"
-            : "lax",
+        secure: true,
+        sameSite: "none",
       }
-    );
-
-    console.log(
-      "[AUTH LOGOUT] Cookie cleared"
-    );
-
-    console.log(
-      "[AUTH LOGOUT] SUCCESS"
-    );
-
-    console.log(
-      "=================================================="
     );
 
     return res.status(200).json({
@@ -827,9 +402,7 @@ export const logout = async (
       message:
         "Logged out successfully.",
     });
-
   } catch (error) {
-
     console.error(
       "[AUTH LOGOUT] ERROR:",
       error
@@ -842,3 +415,4 @@ export const logout = async (
     });
   }
 };
+
