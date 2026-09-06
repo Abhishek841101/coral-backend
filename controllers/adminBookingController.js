@@ -1203,333 +1203,334 @@ export const getBookingStats = async (
    month is 1-12
    ===================================================== */
 
-export const getBookingCalendar = async (
-  req,
-  res
-) => {
-  try {
-    const now = new Date();
+export const getBookingCalendar = async (req, res) => {
+try {
+const now = new Date();
 
-    let year = Number(req.query.year);
-    let month = Number(req.query.month);
 
+let year = Number(req.query.year);
+let month = Number(req.query.month);
+
+if (
+  !Number.isInteger(year) ||
+  year < 2000 ||
+  year > 2100
+) {
+  year = now.getFullYear();
+}
+
+if (
+  !Number.isInteger(month) ||
+  month < 1 ||
+  month > 12
+) {
+  month = now.getMonth() + 1;
+}
+
+const monthIndex = month - 1;
+
+const monthStart = startOfMonth(
+  year,
+  monthIndex
+);
+
+const monthEnd = endOfMonth(
+  year,
+  monthIndex
+);
+
+/* =====================================================
+   GET CONFIRMED + PAID BOOKINGS ONLY
+
+   Calendar should show real confirmed bookings.
+
+   pending  -> NOT shown as booked
+   rejected -> NOT shown
+   cancelled -> NOT shown
+   completed -> NOT shown
+
+   confirmed + paid -> BOOKED
+===================================================== */
+
+const bookings = await Booking.find({
+  status: "confirmed",
+  paymentStatus: "paid",
+
+  checkIn: {
+    $lt: monthEnd,
+  },
+
+  checkOut: {
+    $gt: monthStart,
+  },
+})
+  .populate(
+    "property",
+    "title city locality guests rent images"
+  )
+  .populate(
+    "user",
+    "name email phone"
+  )
+  .sort({
+    checkIn: 1,
+  })
+  .lean();
+
+/* =====================================================
+   CREATE EVERY DAY OF MONTH
+===================================================== */
+
+const days = {};
+
+const cursor = new Date(monthStart);
+
+while (cursor <= monthEnd) {
+  const key =
+    `${cursor.getFullYear()}-${String(
+      cursor.getMonth() + 1
+    ).padStart(2, "0")}-${String(
+      cursor.getDate()
+    ).padStart(2, "0")}`;
+
+  days[key] = {
+    date: key,
+    bookingCount: 0,
+    bookedRooms: 0,
+    bookings: [],
+    status: "AVAILABLE",
+  };
+
+  cursor.setDate(
+    cursor.getDate() + 1
+  );
+}
+
+/* =====================================================
+   ADD CONFIRMED BOOKINGS TO OCCUPIED DAYS
+===================================================== */
+
+for (const booking of bookings) {
+  const checkIn = startOfDay(
+    booking.checkIn
+  );
+
+  const checkOut = startOfDay(
+    booking.checkOut
+  );
+
+  const bookingRooms = Math.max(
+    Number(booking.rooms) || 1,
+    1
+  );
+
+  const propertyId =
+    booking.property?._id?.toString() ||
+    booking.property?.toString() ||
+    "";
+
+  const propertyTitle =
+    booking.property?.title ||
+    "Property";
+
+  const dayCursor =
+    new Date(checkIn);
+
+  /*
+    CHECKOUT DATE IS NOT OCCUPIED.
+
+    Example:
+
+    checkIn  = 11 Sep
+    checkOut = 12 Sep
+
+    BOOKED:
+    11 Sep
+
+    AVAILABLE:
+    12 Sep
+  */
+
+  while (dayCursor < checkOut) {
     if (
-      !Number.isInteger(year) ||
-      year < 2000 ||
-      year > 2100
+      dayCursor >= monthStart &&
+      dayCursor <= monthEnd
     ) {
-      year = now.getFullYear();
-    }
-
-    if (
-      !Number.isInteger(month) ||
-      month < 1 ||
-      month > 12
-    ) {
-      month = now.getMonth() + 1;
-    }
-
-    const monthIndex = month - 1;
-
-    const monthStart =
-      startOfMonth(
-        year,
-        monthIndex
-      );
-
-    const monthEnd =
-      endOfMonth(
-        year,
-        monthIndex
-      );
-
-    /*
-      Find every booking which touches
-      this calendar month.
-
-      Important:
-      checkOut is exclusive.
-
-      Example:
-      checkIn  = 10 Sep
-      checkOut = 12 Sep
-
-      Occupied:
-      10 Sep
-      11 Sep
-
-      Available again:
-      12 Sep
-    */
-
-    const bookings =
-      await Booking.find({
-        status: {
-          $in: ACTIVE_BOOKING_STATUSES,
-        },
-
-        checkIn: {
-          $lt: monthEnd,
-        },
-
-        checkOut: {
-          $gt: monthStart,
-        },
-      })
-        .populate(
-          "property",
-          "title city locality guests rent images"
-        )
-        .populate(
-          "user",
-          "name email phone"
-        )
-        .sort({
-          checkIn: 1,
-        })
-        .lean();
-
-    /* =================================================
-       CREATE DAILY CALENDAR
-       ================================================= */
-
-    const days = {};
-
-    const cursor = new Date(
-      monthStart
-    );
-
-    while (cursor <= monthEnd) {
       const key =
-        `${cursor.getFullYear()}-${String(
-          cursor.getMonth() + 1
+        `${dayCursor.getFullYear()}-${String(
+          dayCursor.getMonth() + 1
         ).padStart(2, "0")}-${String(
-          cursor.getDate()
+          dayCursor.getDate()
         ).padStart(2, "0")}`;
 
-      days[key] = {
-        date: key,
-        bookingCount: 0,
-        bookedRooms: 0,
-        bookings: [],
-        status: "AVAILABLE",
-      };
+      if (days[key]) {
+        days[key].bookingCount += 1;
 
-      cursor.setDate(
-        cursor.getDate() + 1
-      );
-    }
+        days[key].bookedRooms +=
+          bookingRooms;
 
-    /* =================================================
-       ADD BOOKINGS TO EACH OCCUPIED DAY
-       ================================================= */
+        days[key].bookings.push({
+          _id: booking._id,
 
-    for (const booking of bookings) {
-      const checkIn = startOfDay(
-        booking.checkIn
-      );
+          propertyId,
 
-      const checkOut = startOfDay(
-        booking.checkOut
-      );
+          propertyTitle,
 
-      const bookingRooms =
-        Math.max(
-          Number(booking.rooms) || 1,
-          1
-        );
+          guestName:
+            booking.guestName ||
+            booking.user?.name ||
+            "Guest",
 
-      const propertyId =
-        booking.property?._id?.toString() ||
-        booking.property?.toString();
+          guestPhone:
+            booking.guestPhone ||
+            booking.user?.phone ||
+            "",
 
-      const propertyTitle =
-        booking.property?.title ||
-        "Property";
+          guestEmail:
+            booking.guestEmail ||
+            booking.user?.email ||
+            "",
 
-      /*
-        Start from check-in.
-        Checkout date is NOT occupied.
-      */
+          checkIn:
+            booking.checkIn,
 
-      const dayCursor =
-        new Date(checkIn);
+          checkOut:
+            booking.checkOut,
 
-      while (
-        dayCursor < checkOut
-      ) {
-        if (
-          dayCursor >= monthStart &&
-          dayCursor <= monthEnd
-        ) {
-          const key =
-            `${dayCursor.getFullYear()}-${String(
-              dayCursor.getMonth() + 1
-            ).padStart(2, "0")}-${String(
-              dayCursor.getDate()
-            ).padStart(2, "0")}`;
+          rooms:
+            bookingRooms,
 
-          if (days[key]) {
-            days[key].bookingCount += 1;
+          guests:
+            Number(
+              booking.guests
+            ) || 1,
 
-            days[key].bookedRooms +=
-              bookingRooms;
+          status:
+            booking.status,
 
-            days[key].bookings.push({
-              _id: booking._id,
+          paymentStatus:
+            booking.paymentStatus,
 
-              propertyId,
+          paymentMethod:
+            booking.paymentMethod ||
+            "not_selected",
 
-              propertyTitle,
+          paymentId:
+            booking.paymentId || "",
 
-              guestName:
-                booking.guestName ||
-                booking.user?.name ||
-                "Guest",
-
-              guestPhone:
-                booking.guestPhone ||
-                booking.user?.phone ||
-                "",
-
-              guestEmail:
-                booking.guestEmail ||
-                booking.user?.email ||
-                "",
-
-              checkIn:
-                booking.checkIn,
-
-              checkOut:
-                booking.checkOut,
-
-              rooms:
-                bookingRooms,
-
-              guests:
-                Number(
-                  booking.guests
-                ) || 1,
-
-              status:
-                booking.status,
-
-              paymentStatus:
-                booking.paymentStatus,
-
-              totalAmount:
-                booking.totalAmount,
-            });
-          }
-        }
-
-        dayCursor.setDate(
-          dayCursor.getDate() + 1
-        );
+          totalAmount:
+            booking.totalAmount,
+        });
       }
     }
 
-    /* =================================================
-       FINAL DAY STATUS
-       ================================================= */
-
-    Object.values(days).forEach(
-      (day) => {
-        /*
-          Current system treats one property
-          as one bookable unit.
-
-          Therefore if any active booking
-          occupies the property, day becomes FULL.
-
-          Later, if Property gets totalRooms,
-          this can be upgraded to:
-          bookedRooms >= totalRooms.
-        */
-
-        if (
-          day.bookingCount > 0
-        ) {
-          day.status = "FULL";
-        } else {
-          day.status = "AVAILABLE";
-        }
-      }
+    dayCursor.setDate(
+      dayCursor.getDate() + 1
     );
-
-    const dayList =
-      Object.values(days);
-
-    const todayKey =
-      `${now.getFullYear()}-${String(
-        now.getMonth() + 1
-      ).padStart(2, "0")}-${String(
-        now.getDate()
-      ).padStart(2, "0")}`;
-
-    const today =
-      days[todayKey] || {
-        date: todayKey,
-        bookingCount: 0,
-        bookedRooms: 0,
-        bookings: [],
-        status: "AVAILABLE",
-      };
-
-    const totalBookings =
-      bookings.length;
-
-    const bookedDays =
-      dayList.filter(
-        (day) =>
-          day.bookingCount > 0
-      ).length;
-
-    const availableDays =
-      dayList.filter(
-        (day) =>
-          day.bookingCount === 0
-      ).length;
-
-    const fullDays =
-      dayList.filter(
-        (day) =>
-          day.status === "FULL"
-      ).length;
-
-    return res.status(200).json({
-      success: true,
-
-      calendar: {
-        year,
-        month,
-
-        monthStart,
-        monthEnd,
-
-        today,
-
-        totalBookings,
-
-        bookedDays,
-
-        availableDays,
-
-        fullDays,
-
-        days: dayList,
-      },
-    });
-  } catch (error) {
-    console.error(
-      "Booking calendar error:",
-      error
-    );
-
-    return res.status(500).json({
-      success: false,
-      message:
-        "Unable to fetch booking calendar.",
-    });
   }
+}
+
+/* =====================================================
+   FINAL STATUS
+===================================================== */
+
+Object.values(days).forEach(
+  (day) => {
+    if (day.bookingCount > 0) {
+      day.status = "FULL";
+    } else {
+      day.status = "AVAILABLE";
+    }
+  }
+);
+
+const dayList =
+  Object.values(days);
+
+const todayKey =
+  `${now.getFullYear()}-${String(
+    now.getMonth() + 1
+  ).padStart(2, "0")}-${String(
+    now.getDate()
+  ).padStart(2, "0")}`;
+
+const today =
+  days[todayKey] || {
+    date: todayKey,
+    bookingCount: 0,
+    bookedRooms: 0,
+    bookings: [],
+    status: "AVAILABLE",
+  };
+
+const totalBookings =
+  bookings.length;
+
+const bookedDays =
+  dayList.filter(
+    (day) =>
+      day.bookingCount > 0
+  ).length;
+
+const availableDays =
+  dayList.filter(
+    (day) =>
+      day.bookingCount === 0
+  ).length;
+
+const fullDays =
+  dayList.filter(
+    (day) =>
+      day.status === "FULL"
+  ).length;
+
+/* =====================================================
+   IMPORTANT
+
+   Frontend currently expects:
+
+   data.calendar
+
+   to be an ARRAY.
+
+   Therefore return dayList directly.
+===================================================== */
+
+return res.status(200).json({
+  success: true,
+
+  year,
+  month,
+
+  monthStart,
+  monthEnd,
+
+  today,
+
+  totalBookings,
+
+  bookedDays,
+
+  availableDays,
+
+  fullDays,
+
+  calendar: dayList,
+});
+
+} catch (error) {
+console.error(
+"Booking calendar error:",
+error
+);
+
+
+return res.status(500).json({
+  success: false,
+  message:
+    "Unable to fetch booking calendar.",
+});
+
+
+}
 };
