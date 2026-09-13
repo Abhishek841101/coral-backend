@@ -1,213 +1,576 @@
 
+
+// import mongoose from "mongoose";
+
+// const bookingSchema = new mongoose.Schema(
+//   {
+//     /* =====================================================
+//        USER
+//     ===================================================== */
+
+//     user: {
+//       type: mongoose.Schema.Types.ObjectId,
+//       ref: "User",
+//       required: true,
+//       index: true,
+//     },
+
+//     /* =====================================================
+//        PROPERTY
+//     ===================================================== */
+
+//     property: {
+//       type: mongoose.Schema.Types.ObjectId,
+//       ref: "Property",
+//       required: true,
+//       index: true,
+//     },
+
+//     /* =====================================================
+//        DATES
+//     ===================================================== */
+
+//     checkIn: {
+//       type: Date,
+//       required: true,
+//     },
+
+//     checkOut: {
+//       type: Date,
+//       required: true,
+//     },
+
+//     /* =====================================================
+//        GUESTS
+//     ===================================================== */
+
+//     guests: {
+//       type: Number,
+//       required: true,
+//       min: 1,
+//     },
+
+//     rooms: {
+//       type: Number,
+//       default: 1,
+//       min: 1,
+//     },
+
+//     /* =====================================================
+//        PRICE SNAPSHOT
+
+//        Price is saved at booking time so that future
+//        property price changes do not affect this booking.
+//     ===================================================== */
+
+//     pricePerNight: {
+//       type: Number,
+//       required: true,
+//       min: 0,
+//     },
+
+//     nights: {
+//       type: Number,
+//       required: true,
+//       min: 1,
+//     },
+
+//     subtotal: {
+//       type: Number,
+//       required: true,
+//       min: 0,
+//     },
+
+//     taxes: {
+//       type: Number,
+//       default: 0,
+//       min: 0,
+//     },
+
+//     totalAmount: {
+//       type: Number,
+//       required: true,
+//       min: 0,
+//     },
+
+//     /* =====================================================
+//        CUSTOMER DETAILS
+//     ===================================================== */
+
+//     guestName: {
+//       type: String,
+//       required: true,
+//       trim: true,
+//     },
+
+//     guestPhone: {
+//       type: String,
+//       required: true,
+//       trim: true,
+//     },
+
+//     guestEmail: {
+//       type: String,
+//       required: true,
+//       lowercase: true,
+//       trim: true,
+//     },
+
+//     specialRequest: {
+//       type: String,
+//       trim: true,
+//       maxlength: 1000,
+//       default: "",
+//     },
+
+//     /* =====================================================
+//        BOOKING STATUS
+
+//        pending   → Customer submitted booking
+//        confirmed → Admin approved booking
+//        rejected  → Admin rejected booking
+//        cancelled → Customer/Admin cancelled booking
+//        completed → Stay completed
+//     ===================================================== */
+
+//     status: {
+//       type: String,
+//       enum: [
+//         "pending",
+//         "confirmed",
+//         "rejected",
+//         "cancelled",
+//         "completed",
+//       ],
+//       default: "pending",
+//       index: true,
+//     },
+
+//     /* =====================================================
+//        ADMIN CONFIRMATION
+//     ===================================================== */
+
+//     confirmedBy: {
+//       type: mongoose.Schema.Types.ObjectId,
+//       ref: "User",
+//       default: null,
+//     },
+
+//     confirmedAt: {
+//       type: Date,
+//       default: null,
+//     },
+
+//     /* =====================================================
+//        REJECTION
+//     ===================================================== */
+
+//     rejectionReason: {
+//       type: String,
+//       trim: true,
+//       default: "",
+//     },
+
+//     /* =====================================================
+//        CANCELLATION
+//     ===================================================== */
+
+//     cancellationReason: {
+//       type: String,
+//       trim: true,
+//       default: "",
+//     },
+
+//     cancelledAt: {
+//       type: Date,
+//       default: null,
+//     },
+//   },
+//   {
+//     timestamps: true,
+//   }
+// );
+
+// /* =====================================================
+//    INDEXES
+// ===================================================== */
+
+// /*
+//    Used for checking property booking date conflicts.
+// */
+// bookingSchema.index({
+//   property: 1,
+//   checkIn: 1,
+//   checkOut: 1,
+// });
+
+// /*
+//    Used for customer's booking history.
+// */
+// bookingSchema.index({
+//   user: 1,
+//   createdAt: -1,
+// });
+
+// /*
+//    Used for admin booking dashboard.
+// */
+// bookingSchema.index({
+//   status: 1,
+//   createdAt: -1,
+// });
+
+// /* =====================================================
+//    MODEL
+// ===================================================== */
+
+// const Booking = mongoose.model(
+//   "Booking",
+//   bookingSchema
+// );
+
+// export default Booking;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 import mongoose from "mongoose";
 
 const bookingSchema = new mongoose.Schema(
-  {
-    /* ================= USER ================= */
+{
+/* =====================================================
+USER
+===================================================== */
 
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-      index: true,
-    },
+user: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "User",
+  required: true,
+  index: true,
+},
 
-    /* ================= PROPERTY ================= */
+/* =====================================================
+   PROPERTY / FLAT
+===================================================== */
 
-    property: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Property",
-      required: true,
-      index: true,
-    },
+property: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "Property",
+  required: true,
+  index: true,
+},
 
-    /* ================= DATES ================= */
+/* =====================================================
+   DATES
 
-    checkIn: {
-      type: Date,
-      required: true,
-    },
+   checkIn  = occupied from this date
+   checkOut = NOT occupied on this date
 
-    checkOut: {
-      type: Date,
-      required: true,
-    },
+   Example:
+   10 Sep → 15 Sep = 5 nights
+   Occupied: 10, 11, 12, 13, 14
+   15 Sep is checkout and available.
+===================================================== */
 
-    /* ================= GUESTS ================= */
+checkIn: {
+  type: Date,
+  required: true,
+},
 
-    guests: {
-      type: Number,
-      required: true,
-      min: 1,
-    },
+checkOut: {
+  type: Date,
+  required: true,
+},
 
-    rooms: {
-      type: Number,
-      default: 1,
-      min: 1,
-    },
+/* =====================================================
+   GUESTS
 
-    /* ================= PRICE SNAPSHOT ================= */
+   Actual maximum guest limit comes from:
+   Property.maxGuests
 
-    pricePerNight: {
-      type: Number,
-      required: true,
-      min: 0,
-    },
+   No rooms field.
+===================================================== */
 
-    nights: {
-      type: Number,
-      required: true,
-      min: 1,
-    },
+guests: {
+  type: Number,
+  required: true,
+  min: 1,
+},
 
-    subtotal: {
-      type: Number,
-      required: true,
-      min: 0,
-    },
+/* =====================================================
+   PRICE SNAPSHOT
 
-    taxes: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
+   Coral pricing:
 
-    totalAmount: {
-      type: Number,
-      required: true,
-      min: 0,
-    },
+   property rent × nights
 
-    /* ================= CUSTOMER ================= */
+   No room multiplier.
+   No automatic 5% tax.
+===================================================== */
 
-    guestName: {
-      type: String,
-      required: true,
-      trim: true,
-    },
+pricePerNight: {
+  type: Number,
+  required: true,
+  min: 0,
+},
 
-    guestPhone: {
-      type: String,
-      required: true,
-      trim: true,
-    },
+nights: {
+  type: Number,
+  required: true,
+  min: 1,
+},
 
-    guestEmail: {
-      type: String,
-      required: true,
-      lowercase: true,
-      trim: true,
-    },
+subtotal: {
+  type: Number,
+  required: true,
+  min: 0,
+},
 
-    specialRequest: {
-      type: String,
-      trim: true,
-      maxlength: 1000,
-      default: "",
-    },
+/* =====================================================
+   TAXES
 
-    /* ================= BOOKING STATUS ================= */
+   Kept for compatibility.
 
-    status: {
-      type: String,
-      enum: [
-        "pending",
-        "confirmed",
-        "rejected",
-        "cancelled",
-        "completed",
-      ],
-      default: "pending",
-      index: true,
-    },
+   Coral does NOT automatically calculate tax.
+   Admin can handle GST/payment manually later.
+===================================================== */
 
-    /* ================= PAYMENT ================= */
+taxes: {
+  type: Number,
+  default: 0,
+  min: 0,
+},
 
-    paymentStatus: {
-      type: String,
-      enum: [
-        "pending",
-        "paid",
-        "failed",
-        "refunded",
-      ],
-      default: "pending",
-      index: true,
-    },
+/* =====================================================
+   TOTAL AMOUNT
 
-    paymentMethod: {
-      type: String,
-      enum: [
-        "online",
-        "cash",
-        "not_selected",
-      ],
-      default: "not_selected",
-    },
+   Stage 1:
 
-    paymentId: {
-      type: String,
-      default: "",
-      trim: true,
-    },
+   totalAmount = subtotal + taxes
 
-    /* ================= ADMIN ================= */
+   Since automatic taxes are not applied,
+   normally totalAmount = subtotal.
+===================================================== */
 
-    confirmedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      default: null,
-    },
+totalAmount: {
+  type: Number,
+  required: true,
+  min: 0,
+},
 
-    confirmedAt: {
-      type: Date,
-      default: null,
-    },
+/* =====================================================
+   CUSTOMER DETAILS
+===================================================== */
 
-    rejectionReason: {
-      type: String,
-      trim: true,
-      default: "",
-    },
+guestName: {
+  type: String,
+  required: true,
+  trim: true,
+  maxlength: 150,
+},
 
-    cancellationReason: {
-      type: String,
-      trim: true,
-      default: "",
-    },
+guestPhone: {
+  type: String,
+  required: true,
+  trim: true,
+  maxlength: 30,
+},
 
-    cancelledAt: {
-      type: Date,
-      default: null,
-    },
-  },
-  {
-    timestamps: true,
-  }
+guestEmail: {
+  type: String,
+  required: true,
+  lowercase: true,
+  trim: true,
+  maxlength: 254,
+},
+
+/* =====================================================
+   SPECIAL REQUEST
+===================================================== */
+
+specialRequest: {
+  type: String,
+  trim: true,
+  maxlength: 1000,
+  default: "",
+},
+
+/* =====================================================
+   BOOKING STATUS
+
+   pending
+     Customer submitted request.
+     Does NOT block property dates.
+
+   confirmed
+     Admin confirmed booking.
+     BLOCKS property dates.
+
+   rejected
+     Request rejected.
+     Does NOT block dates.
+
+   cancelled
+     Booking cancelled.
+     Does NOT block dates.
+
+   completed
+     Stay completed.
+     Does NOT block future availability.
+===================================================== */
+
+status: {
+  type: String,
+  enum: [
+    "pending",
+    "confirmed",
+    "rejected",
+    "cancelled",
+    "completed",
+  ],
+  default: "pending",
+  index: true,
+},
+
+/* =====================================================
+   ADMIN CONFIRMATION
+===================================================== */
+
+confirmedBy: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "User",
+  default: null,
+},
+
+confirmedAt: {
+  type: Date,
+  default: null,
+},
+
+/* =====================================================
+   REJECTION
+===================================================== */
+
+rejectionReason: {
+  type: String,
+  trim: true,
+  maxlength: 1000,
+  default: "",
+},
+
+/* =====================================================
+   CANCELLATION
+===================================================== */
+
+cancellationReason: {
+  type: String,
+  trim: true,
+  maxlength: 1000,
+  default: "",
+},
+
+cancelledAt: {
+  type: Date,
+  default: null,
+},
+
+},
+{
+timestamps: true,
+}
 );
 
-/* ================= INDEXES ================= */
+/* =====================================================
+VALIDATION
+===================================================== */
 
-bookingSchema.index({
-  property: 1,
-  checkIn: 1,
-  checkOut: 1,
+/*
+Check-out must be after check-in.
+
+This validation prevents invalid booking ranges.
+*/
+
+bookingSchema.pre("validate", function (next) {
+if (this.checkIn && this.checkOut) {
+if (this.checkOut <= this.checkIn) {
+return next(
+new Error("Check-out date must be after check-in date.")
+);
+}
+}
+
+next();
 });
 
-bookingSchema.index({
-  user: 1,
-  createdAt: -1,
-});
+/* =====================================================
+INDEXES
+===================================================== */
+
+/*
+Property/date lookup.
+
+Used for checking confirmed booking conflicts.
+
+IMPORTANT:
+Application logic checks only:
+status: "confirmed"
+*/
 
 bookingSchema.index({
-  status: 1,
-  createdAt: -1,
+property: 1,
+status: 1,
+checkIn: 1,
+checkOut: 1,
 });
+
+/*
+Customer booking history.
+*/
+
+bookingSchema.index({
+user: 1,
+createdAt: -1,
+});
+
+/*
+Admin booking dashboard.
+*/
+
+bookingSchema.index({
+status: 1,
+createdAt: -1,
+});
+
+/*
+Property booking history.
+*/
+
+bookingSchema.index({
+property: 1,
+createdAt: -1,
+});
+
+/* =====================================================
+MODEL
+===================================================== */
 
 const Booking = mongoose.model(
-  "Booking",
-  bookingSchema
+"Booking",
+bookingSchema
 );
 
 export default Booking;

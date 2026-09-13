@@ -1,3 +1,5 @@
+
+
 // import express from "express";
 
 // import {
@@ -11,51 +13,54 @@
 
 // const router = express.Router();
 
-// /* ================= ALL BOOKINGS REQUIRE LOGIN ================= */
+// /* =====================================================
+//    CUSTOMER AUTHENTICATION
+// ===================================================== */
 
 // router.use(protect);
 
-// /* ================= CREATE ================= */
+// /* =====================================================
+//    CREATE BOOKING
 
-// router.post(
-//   "/",
-//   createBooking
-// );
+//    POST /api/bookings
+// ===================================================== */
 
-// /* ================= MY BOOKINGS ================= */
+// router.post("/", createBooking);
 
-// router.get(
-//   "/my",
-//   getMyBookings
-// );
+// /* =====================================================
+//    GET MY BOOKINGS
 
-// /* ================= SINGLE BOOKING ================= */
+//    GET /api/bookings/my
+// ===================================================== */
 
-// router.get(
-//   "/:id",
-//   getBookingById
-// );
+// router.get("/my", getMyBookings);
 
-// /* ================= CANCEL ================= */
+// /* =====================================================
+//    GET SINGLE BOOKING
 
-// router.patch(
-//   "/:id/cancel",
-//   cancelBooking
-// );
+//    GET /api/bookings/:id
+// ===================================================== */
+
+// router.get("/:id", getBookingById);
+
+// /* =====================================================
+//    CANCEL BOOKING
+
+//    PATCH /api/bookings/:id/cancel
+// ===================================================== */
+
+// router.patch("/:id/cancel", cancelBooking);
 
 // export default router;
-
-
 
 
 import express from "express";
 
 import {
-  createBooking,
-  getMyBookings,
-  getBookingById,
-  cancelBooking,
-  payBooking,
+createBooking,
+getMyBookings,
+getBookingById,
+cancelBooking,
 } from "../controllers/bookingController.js";
 
 import { protect } from "../middleware/authMiddleware.js";
@@ -63,45 +68,90 @@ import { protect } from "../middleware/authMiddleware.js";
 const router = express.Router();
 
 /* =====================================================
-   CUSTOMER AUTHENTICATION
+CUSTOMER AUTHENTICATION
+
+Existing customer JWT cookie authentication
+remains completely unchanged.
+
+protect middleware reads:
+req.cookies.coral_token
 ===================================================== */
 
 router.use(protect);
 
 /* =====================================================
-   CREATE BOOKING
-   POST /api/bookings
+CREATE BOOKING REQUEST
+
+POST /api/bookings
+
+Customer submits:
+
+property
+checkIn
+checkOut
+guests
+guestName
+guestPhone
+guestEmail
+specialRequest
+
+Result:
+status = pending
+
+This is a booking REQUEST.
+It is NOT immediately confirmed.
 ===================================================== */
 
-router.post("/", createBooking);
+router.post(
+"/",
+createBooking
+);
 
 /* =====================================================
-   GET MY BOOKINGS
-   GET /api/bookings/my
+GET MY BOOKINGS
+
+GET /api/bookings/my
+
+Returns bookings belonging to logged-in customer.
 ===================================================== */
 
-router.get("/my", getMyBookings);
+router.get(
+"/my",
+getMyBookings
+);
 
 /* =====================================================
-   GET SINGLE BOOKING
-   GET /api/bookings/:id
+GET SINGLE BOOKING
+
+GET /api/bookings/:id
+
+Returns booking details for logged-in customer.
 ===================================================== */
 
-router.get("/:id", getBookingById);
+router.get(
+"/:id",
+getBookingById
+);
 
 /* =====================================================
-   PAY BOOKING
-   PATCH /api/bookings/:id/pay
+CUSTOMER CANCELLATION
+
+PATCH /api/bookings/:id/cancel
+
+Stage 2 customer feature.
+
+Route is intentionally kept for backend
+compatibility, but Stage 1 frontend should
+NOT expose a cancel button.
 ===================================================== */
 
-router.patch("/:id/pay", payBooking);
+router.patch(
+"/:id/cancel",
+cancelBooking
+);
 
 /* =====================================================
-   CANCEL BOOKING
-   PATCH /api/bookings/:id/cancel
+EXPORT
 ===================================================== */
-
-router.patch("/:id/cancel", cancelBooking);
 
 export default router;
-
