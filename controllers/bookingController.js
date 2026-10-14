@@ -1,758 +1,4 @@
 
-// import mongoose from "mongoose";
-// import Booking from "../models/Booking.js";
-// import Property from "../models/Property.js";
-
-// /* =====================================================
-//    BOOKING RULES
-// ===================================================== */
-
-// // One room can accommodate maximum 3 guests.
-// const MAX_GUESTS_PER_ROOM = 3;
-
-// /* =====================================================
-//    HELPERS
-// ===================================================== */
-
-// const normalizeDate = (value) => {
-//   const date = new Date(value);
-
-//   if (Number.isNaN(date.getTime())) {
-//     return null;
-//   }
-
-//   date.setHours(0, 0, 0, 0);
-
-//   return date;
-// };
-
-// const calculateNights = (checkIn, checkOut) => {
-//   const difference =
-//     checkOut.getTime() - checkIn.getTime();
-
-//   return Math.ceil(
-//     difference / (1000 * 60 * 60 * 24)
-//   );
-// };
-
-// /* =====================================================
-//    CREATE BOOKING
-//    POST /api/bookings
-
-//    CUSTOMER FLOW:
-
-//    Customer submits booking
-//           ↓
-//    status = pending
-//           ↓
-//    Admin reviews booking
-//           ↓
-//    Call / WhatsApp customer
-//           ↓
-//    External payment
-//           ↓
-//    Admin confirms booking
-//           ↓
-//    status = confirmed
-// ===================================================== */
-
-// export const createBooking = async (req, res) => {
-//   try {
-//     const {
-//       propertyId,
-//       checkIn,
-//       checkOut,
-//       guests,
-//       rooms,
-//       guestName,
-//       guestPhone,
-//       guestEmail,
-//       specialRequest,
-//     } = req.body;
-
-//     /* =================================================
-//        USER AUTHENTICATION
-//     ================================================= */
-
-//     const userId =
-//       req.user?._id ||
-//       req.user?.id;
-
-//     if (!userId) {
-//       return res.status(401).json({
-//         success: false,
-//         message: "Authentication required.",
-//       });
-//     }
-
-//     /* =================================================
-//        PROPERTY ID
-//     ================================================= */
-
-//     if (
-//       !propertyId ||
-//       !mongoose.Types.ObjectId.isValid(propertyId)
-//     ) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Invalid property.",
-//       });
-//     }
-
-//     /* =================================================
-//        DATES
-//     ================================================= */
-
-//     const startDate = normalizeDate(checkIn);
-//     const endDate = normalizeDate(checkOut);
-
-//     if (!startDate || !endDate) {
-//       return res.status(400).json({
-//         success: false,
-//         message:
-//           "Please provide valid check-in and check-out dates.",
-//       });
-//     }
-
-//     if (endDate <= startDate) {
-//       return res.status(400).json({
-//         success: false,
-//         message:
-//           "Check-out date must be after check-in date.",
-//       });
-//     }
-
-//     /* =================================================
-//        GUESTS & ROOMS
-//     ================================================= */
-
-//     const guestCount = Number(guests);
-//     const roomCount = Number(rooms || 1);
-
-//     if (
-//       !Number.isInteger(guestCount) ||
-//       guestCount < 1
-//     ) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Guests must be at least 1.",
-//       });
-//     }
-
-//     if (
-//       !Number.isInteger(roomCount) ||
-//       roomCount < 1
-//     ) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Rooms must be at least 1.",
-//       });
-//     }
-
-//     /* =================================================
-//        GUEST CAPACITY
-
-//        1 room  = 3 guests
-//        2 rooms = 6 guests
-//        3 rooms = 9 guests
-//     ================================================= */
-
-//     const maximumGuests =
-//       MAX_GUESTS_PER_ROOM * roomCount;
-
-//     if (guestCount > maximumGuests) {
-//       return res.status(400).json({
-//         success: false,
-//         message:
-//           `Maximum ${maximumGuests} guests are allowed for ${roomCount} room(s).`,
-//       });
-//     }
-
-//     /* =================================================
-//        CUSTOMER DETAILS
-//     ================================================= */
-
-//     const cleanGuestName =
-//       typeof guestName === "string"
-//         ? guestName.trim()
-//         : "";
-
-//     const cleanGuestPhone =
-//       typeof guestPhone === "string"
-//         ? guestPhone.trim()
-//         : "";
-
-//     const cleanGuestEmail =
-//       typeof guestEmail === "string"
-//         ? guestEmail.trim().toLowerCase()
-//         : "";
-
-//     const cleanSpecialRequest =
-//       typeof specialRequest === "string"
-//         ? specialRequest.trim()
-//         : "";
-
-//     if (!cleanGuestName) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Guest name is required.",
-//       });
-//     }
-
-//     if (!cleanGuestPhone) {
-//       return res.status(400).json({
-//         success: false,
-//         message:
-//           "Guest phone number is required.",
-//       });
-//     }
-
-//     if (!cleanGuestEmail) {
-//       return res.status(400).json({
-//         success: false,
-//         message:
-//           "Guest email is required.",
-//       });
-//     }
-
-//     /* =================================================
-//        EMAIL VALIDATION
-//     ================================================= */
-
-//     const emailRegex =
-//       /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-//     if (!emailRegex.test(cleanGuestEmail)) {
-//       return res.status(400).json({
-//         success: false,
-//         message:
-//           "Please provide a valid email address.",
-//       });
-//     }
-
-//     /* =================================================
-//        PROPERTY
-//     ================================================= */
-
-//     const property =
-//       await Property.findOne({
-//         _id: propertyId,
-//         approvalStatus: "approved",
-//         status: "active",
-//       });
-
-//     if (!property) {
-//       return res.status(404).json({
-//         success: false,
-//         message:
-//           "Property is not available for booking.",
-//       });
-//     }
-
-//     /* =================================================
-//        DATE AVAILABILITY
-
-//        Pending and confirmed bookings
-//        block the selected dates.
-//     ================================================= */
-
-//     const overlappingBooking =
-//       await Booking.findOne({
-//         property: propertyId,
-
-//         status: {
-//           $in: [
-//             "pending",
-//             "confirmed",
-//           ],
-//         },
-
-//         checkIn: {
-//           $lt: endDate,
-//         },
-
-//         checkOut: {
-//           $gt: startDate,
-//         },
-//       }).lean();
-
-//     if (overlappingBooking) {
-//       return res.status(409).json({
-//         success: false,
-//         message:
-//           "This property is already booked or awaiting confirmation for the selected dates.",
-//       });
-//     }
-
-//     /* =================================================
-//        NIGHTS
-//     ================================================= */
-
-//     const nights = calculateNights(
-//       startDate,
-//       endDate
-//     );
-
-//     if (nights <= 0) {
-//       return res.status(400).json({
-//         success: false,
-//         message:
-//           "Invalid booking duration.",
-//       });
-//     }
-
-//     /* =================================================
-//        PRICE
-//     ================================================= */
-
-//     const rentPerNight =
-//       Number(property.rent || 0);
-
-//     if (rentPerNight <= 0) {
-//       return res.status(400).json({
-//         success: false,
-//         message:
-//           "Property price is not available.",
-//       });
-//     }
-
-//     const subtotal =
-//       rentPerNight *
-//       nights *
-//       roomCount;
-
-//     const taxes =
-//       Math.round(
-//         subtotal * 0.05 * 100
-//       ) / 100;
-
-//     const totalAmount =
-//       Math.round(
-//         (subtotal + taxes) * 100
-//       ) / 100;
-
-//     /* =================================================
-//        CREATE BOOKING
-
-//        IMPORTANT:
-
-//        status = pending
-
-//        No online payment.
-//        No payment processing.
-//        No payment fields.
-//     ================================================= */
-
-//     const booking =
-//       await Booking.create({
-//         user: userId,
-
-//         property: propertyId,
-
-//         checkIn: startDate,
-
-//         checkOut: endDate,
-
-//         guests: guestCount,
-
-//         rooms: roomCount,
-
-//         pricePerNight:
-//           rentPerNight,
-
-//         nights,
-
-//         subtotal,
-
-//         taxes,
-
-//         totalAmount,
-
-//         guestName:
-//           cleanGuestName,
-
-//         guestPhone:
-//           cleanGuestPhone,
-
-//         guestEmail:
-//           cleanGuestEmail,
-
-//         specialRequest:
-//           cleanSpecialRequest,
-
-//         status: "pending",
-//       });
-
-//     /*
-//      * IMPORTANT:
-//      *
-//      * bookingsCount is NOT increased here.
-//      *
-//      * The booking is only pending.
-//      *
-//      * It should increase when admin confirms
-//      * the booking.
-//      */
-
-//     /* =================================================
-//        POPULATE BOOKING
-//     ================================================= */
-
-//     const populatedBooking =
-//       await Booking.findById(
-//         booking._id
-//       )
-//         .populate("property")
-//         .populate(
-//           "user",
-//           "name email phone"
-//         );
-
-//     /* =================================================
-//        RESPONSE
-//     ================================================= */
-
-//     return res.status(201).json({
-//       success: true,
-
-//       message:
-//         "Booking request created successfully. Our team will contact you for confirmation.",
-
-//       booking:
-//         populatedBooking,
-//     });
-//   } catch (error) {
-//     console.error(
-//       "Create booking error:",
-//       error
-//     );
-
-//     return res.status(500).json({
-//       success: false,
-//       message:
-//         error.message ||
-//         "Unable to create booking.",
-//     });
-//   }
-// };
-
-// /* =====================================================
-//    GET MY BOOKINGS
-//    GET /api/bookings/my
-// ===================================================== */
-
-// export const getMyBookings = async (
-//   req,
-//   res
-// ) => {
-//   try {
-//     const userId =
-//       req.user?._id ||
-//       req.user?.id;
-
-//     if (!userId) {
-//       return res.status(401).json({
-//         success: false,
-//         message:
-//           "Authentication required.",
-//       });
-//     }
-
-//     const bookings =
-//       await Booking.find({
-//         user: userId,
-//       })
-//         .populate("property")
-//         .sort({
-//           createdAt: -1,
-//         });
-
-//     return res.status(200).json({
-//       success: true,
-//       count: bookings.length,
-//       bookings,
-//     });
-//   } catch (error) {
-//     console.error(
-//       "Get my bookings error:",
-//       error
-//     );
-
-//     return res.status(500).json({
-//       success: false,
-//       message:
-//         error.message ||
-//         "Unable to fetch bookings.",
-//     });
-//   }
-// };
-
-// /* =====================================================
-//    GET BOOKING BY ID
-//    GET /api/bookings/:id
-
-//    Customer can only see their own booking.
-// ===================================================== */
-
-// export const getBookingById = async (
-//   req,
-//   res
-// ) => {
-//   try {
-//     const { id } = req.params;
-
-//     /* =================================================
-//        VALIDATE BOOKING ID
-//     ================================================= */
-
-//     if (
-//       !id ||
-//       !mongoose.Types.ObjectId.isValid(id)
-//     ) {
-//       return res.status(400).json({
-//         success: false,
-//         message:
-//           "Invalid booking ID.",
-//       });
-//     }
-
-//     /* =================================================
-//        USER
-//     ================================================= */
-
-//     const userId =
-//       req.user?._id ||
-//       req.user?.id;
-
-//     if (!userId) {
-//       return res.status(401).json({
-//         success: false,
-//         message:
-//           "Authentication required.",
-//       });
-//     }
-
-//     /* =================================================
-//        FIND BOOKING
-//     ================================================= */
-
-//     const booking =
-//       await Booking.findOne({
-//         _id: id,
-//         user: userId,
-//       })
-//         .populate("property")
-//         .populate(
-//           "user",
-//           "name email phone"
-//         );
-
-//     if (!booking) {
-//       return res.status(404).json({
-//         success: false,
-//         message:
-//           "Booking not found.",
-//       });
-//     }
-
-//     return res.status(200).json({
-//       success: true,
-//       booking,
-//     });
-//   } catch (error) {
-//     console.error(
-//       "Get booking error:",
-//       error
-//     );
-
-//     return res.status(500).json({
-//       success: false,
-//       message:
-//         error.message ||
-//         "Unable to fetch booking.",
-//     });
-//   }
-// };
-
-// /* =====================================================
-//    CANCEL BOOKING
-//    PATCH /api/bookings/:id/cancel
-// ===================================================== */
-
-// export const cancelBooking = async (
-//   req,
-//   res
-// ) => {
-//   try {
-//     const { id } = req.params;
-
-//     /* =================================================
-//        VALIDATE BOOKING ID
-//     ================================================= */
-
-//     if (
-//       !id ||
-//       !mongoose.Types.ObjectId.isValid(id)
-//     ) {
-//       return res.status(400).json({
-//         success: false,
-//         message:
-//           "Invalid booking ID.",
-//       });
-//     }
-
-//     /* =================================================
-//        USER
-//     ================================================= */
-
-//     const userId =
-//       req.user?._id ||
-//       req.user?.id;
-
-//     if (!userId) {
-//       return res.status(401).json({
-//         success: false,
-//         message:
-//           "Authentication required.",
-//       });
-//     }
-
-//     /* =================================================
-//        FIND BOOKING
-//     ================================================= */
-
-//     const booking =
-//       await Booking.findOne({
-//         _id: id,
-//         user: userId,
-//       });
-
-//     if (!booking) {
-//       return res.status(404).json({
-//         success: false,
-//         message:
-//           "Booking not found.",
-//       });
-//     }
-
-//     /* =================================================
-//        STATUS CHECK
-//     ================================================= */
-
-//     if (
-//       [
-//         "cancelled",
-//         "completed",
-//         "rejected",
-//       ].includes(booking.status)
-//     ) {
-//       return res.status(400).json({
-//         success: false,
-//         message:
-//           "This booking cannot be cancelled.",
-//       });
-//     }
-
-//     /* =================================================
-//        CHECK-IN DATE
-//     ================================================= */
-
-//     const today = new Date();
-
-//     today.setHours(
-//       0,
-//       0,
-//       0,
-//       0
-//     );
-
-//     const bookingCheckIn =
-//       new Date(
-//         booking.checkIn
-//       );
-
-//     bookingCheckIn.setHours(
-//       0,
-//       0,
-//       0,
-//       0
-//     );
-
-//     if (
-//       bookingCheckIn <= today
-//     ) {
-//       return res.status(400).json({
-//         success: false,
-//         message:
-//           "Booking cannot be cancelled after check-in date.",
-//       });
-//     }
-
-//     /* =================================================
-//        CANCEL BOOKING
-//     ================================================= */
-
-//     booking.status =
-//       "cancelled";
-
-//     booking.cancelledAt =
-//       new Date();
-
-//     const cancellationReason =
-//       typeof req.body?.reason ===
-//       "string"
-//         ? req.body.reason.trim()
-//         : "";
-
-//     booking.cancellationReason =
-//       cancellationReason ||
-//       "Booking cancelled by customer.";
-
-//     await booking.save();
-
-//     /* =================================================
-//        UPDATED BOOKING
-//     ================================================= */
-
-//     const updatedBooking =
-//       await Booking.findById(
-//         booking._id
-//       )
-//         .populate("property")
-//         .populate(
-//           "user",
-//           "name email phone"
-//         );
-
-//     /* =================================================
-//        RESPONSE
-//     ================================================= */
-
-//     return res.status(200).json({
-//       success: true,
-
-//       message:
-//         "Booking cancelled successfully.",
-
-//       booking:
-//         updatedBooking,
-//     });
-//   } catch (error) {
-//     console.error(
-//       "Cancel booking error:",
-//       error
-//     );
-
-//     return res.status(500).json({
-//       success: false,
-//       message:
-//         error.message ||
-//         "Unable to cancel booking.",
-//     });
-//   }
-// };
-
-
 import mongoose from "mongoose";
 import Booking from "../models/Booking.js";
 import Property from "../models/Property.js";
@@ -803,552 +49,509 @@ Payment / documents
 Admin confirms or rejects
 ===================================================== */
 
-export const createBooking = async (
-req,
-res
-) => {
-try {
-/* =================================================
-REQUEST DATA
-================================================= */
 
-const {
-  propertyId,
-  checkIn,
-  checkOut,
-  guests,
-  guestName,
-  guestPhone,
-  guestEmail,
-  specialRequest,
-} = req.body || {};
-
-/* =================================================
-   USER AUTHENTICATION
-
-   Existing customer authentication remains
-   completely unchanged.
-================================================= */
-
-const userId =
-  req.user?._id ||
-  req.user?.id;
-
-if (!userId) {
-  return res.status(401).json({
-    success: false,
-    message:
-      "Authentication required.",
-  });
-}
-
-/* =================================================
-   PROPERTY ID
-================================================= */
-
-if (
-  !propertyId ||
-  !mongoose.Types.ObjectId.isValid(
-    propertyId
-  )
-) {
-  return res.status(400).json({
-    success: false,
-    message:
-      "Invalid property.",
-  });
-}
-
-/* =================================================
-   DATES
-================================================= */
-
-const startDate =
-  normalizeDate(checkIn);
-
-const endDate =
-  normalizeDate(checkOut);
-
-if (
-  !startDate ||
-  !endDate
-) {
-  return res.status(400).json({
-    success: false,
-    message:
-      "Please provide valid check-in and check-out dates.",
-  });
-}
-
-/* =================================================
-   CHECK-IN CANNOT BE IN THE PAST
-================================================= */
-
-const today =
-  new Date();
-
-today.setHours(
-  0,
-  0,
-  0,
-  0
-);
-
-if (
-  startDate < today
-) {
-  return res.status(400).json({
-    success: false,
-    message:
-      "Check-in date cannot be in the past.",
-  });
-}
-
-/* =================================================
-   CHECK-OUT MUST BE AFTER CHECK-IN
-================================================= */
-
-if (
-  endDate <= startDate
-) {
-  return res.status(400).json({
-    success: false,
-    message:
-      "Check-out date must be after check-in date.",
-  });
-}
-
-/* =================================================
-   GUESTS
-================================================= */
-
-const guestCount =
-  Number(guests);
-
-if (
-  !Number.isInteger(
-    guestCount
-  ) ||
-  guestCount < 1
-) {
-  return res.status(400).json({
-    success: false,
-    message:
-      "Guests must be at least 1.",
-  });
-}
-
-/* =================================================
-   CUSTOMER DETAILS
-================================================= */
-
-const cleanGuestName =
-  typeof guestName ===
-  "string"
-    ? guestName.trim()
-    : "";
-
-const cleanGuestPhone =
-  typeof guestPhone ===
-  "string"
-    ? guestPhone.trim()
-    : "";
-
-const cleanGuestEmail =
-  typeof guestEmail ===
-  "string"
-    ? guestEmail
-        .trim()
-        .toLowerCase()
-    : "";
-
-const cleanSpecialRequest =
-  typeof specialRequest ===
-  "string"
-    ? specialRequest.trim()
-    : "";
-
-/* =================================================
-   NAME
-================================================= */
-
-if (
-  !cleanGuestName
-) {
-  return res.status(400).json({
-    success: false,
-    message:
-      "Guest name is required.",
-  });
-}
-
-/* =================================================
-   PHONE
-================================================= */
-
-if (
-  !cleanGuestPhone
-) {
-  return res.status(400).json({
-    success: false,
-    message:
-      "Guest phone number is required.",
-  });
-}
-
-/* =================================================
-   EMAIL
-================================================= */
-
-if (
-  !cleanGuestEmail
-) {
-  return res.status(400).json({
-    success: false,
-    message:
-      "Guest email is required.",
-  });
-}
-
-const emailRegex =
-  /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-if (
-  !emailRegex.test(
-    cleanGuestEmail
-  )
-) {
-  return res.status(400).json({
-    success: false,
-    message:
-      "Please provide a valid email address.",
-  });
-}
-
-/* =================================================
-   SPECIAL REQUEST
-================================================= */
-
-if (
-  cleanSpecialRequest.length >
-  1000
-) {
-  return res.status(400).json({
-    success: false,
-    message:
-      "Special request cannot exceed 1000 characters.",
-  });
-}
-
-/* =================================================
-   PROPERTY
-
-   Only approved + active properties
-   can receive booking requests.
-================================================= */
-
-const property =
-  await Property.findOne({
-    _id: propertyId,
-    approvalStatus:
-      "approved",
-    status: "active",
-  });
-
-if (!property) {
-  return res.status(404).json({
-    success: false,
-    message:
-      "Property is not available for booking.",
-  });
-}
-
-/* =================================================
-   MAXIMUM GUEST CAPACITY
-
-   New properties:
-   maxGuests
-
-   Existing properties:
-   guests
-
-   Compatibility fallback:
-   maxGuests → guests → 1
-================================================= */
-
-const maximumGuests =
-  Number(
-    property.maxGuests ??
-    property.guests ??
-    1
-  );
-
-if (
-  !Number.isInteger(
-    maximumGuests
-  ) ||
-  maximumGuests < 1
-) {
-  return res.status(500).json({
-    success: false,
-    message:
-      "Property maximum guest capacity is not configured.",
-  });
-}
-
-if (
-  guestCount >
-  maximumGuests
-) {
-  return res.status(400).json({
-    success: false,
-    message:
-      `Maximum ${maximumGuests} guests are allowed for this property.`,
-  });
-}
-
-/* =================================================
-   AVAILABILITY
-
-   IMPORTANT CORAL RULE:
-
-   pending
-   → DOES NOT BLOCK
-
-   confirmed
-   → BLOCKS
-
-   rejected
-   → DOES NOT BLOCK
-
-   cancelled
-   → DOES NOT BLOCK
-
-   completed
-   → DOES NOT BLOCK
-
-   Multiple customers can therefore create
-   pending requests for the same property
-   and overlapping dates.
-
-   Only a confirmed booking blocks dates.
-================================================= */
-
-const overlappingBooking =
-  await Booking.findOne({
-    property:
+export const createBooking = async (req, res) => {
+  try {
+    const {
       propertyId,
+      checkIn,
+      checkOut,
+      guests,
+      guestName,
+      guestPhone,
+      guestEmail,
+      specialRequest,
+      sleepingArrangements = [],
+      pets = [],
+    } = req.body || {};
 
-    status:
-      "confirmed",
+    // Authentication
+    const userId = req.user?._id || req.user?.id;
 
-    checkIn: {
-      $lt: endDate,
-    },
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required.",
+      });
+    }
 
-    checkOut: {
-      $gt: startDate,
-    },
-  }).lean();
+    // Property ID
+    if (
+      !propertyId ||
+      !mongoose.Types.ObjectId.isValid(propertyId)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid property.",
+      });
+    }
 
-if (
-  overlappingBooking
-) {
-  return res.status(409).json({
-    success: false,
-    message:
-      "This property is already booked for the selected dates.",
-  });
-}
+    // Dates
+    const startDate = normalizeDate(checkIn);
+    const endDate = normalizeDate(checkOut);
 
-/* =================================================
-   NIGHTS
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide valid check-in and check-out dates.",
+      });
+    }
 
-   Example:
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-   Check-in 10 Sep
-   Check-out 15 Sep
+    if (startDate < today) {
+      return res.status(400).json({
+        success: false,
+        message: "Check-in date cannot be in the past.",
+      });
+    }
 
-   Nights = 5
+    if (endDate <= startDate) {
+      return res.status(400).json({
+        success: false,
+        message: "Check-out date must be after check-in date.",
+      });
+    }
 
-   Occupied:
-   10, 11, 12, 13, 14
+    // Guest count
+    const guestCount = Number(guests);
 
-   Checkout:
-   15 Sep
-   → available
-================================================= */
+    if (!Number.isInteger(guestCount) || guestCount < 1) {
+      return res.status(400).json({
+        success: false,
+        message: "Guests must be at least 1.",
+      });
+    }
 
-const nights =
-  calculateNights(
-    startDate,
-    endDate
-  );
+    // Customer details
+    const cleanGuestName =
+      typeof guestName === "string" ? guestName.trim() : "";
 
-if (
-  !Number.isInteger(
-    nights
-  ) ||
-  nights <= 0
-) {
-  return res.status(400).json({
-    success: false,
-    message:
-      "Invalid booking duration.",
-  });
-}
+    const cleanGuestPhone =
+      typeof guestPhone === "string" ? guestPhone.trim() : "";
 
-/* =================================================
-   PROPERTY RENT
+    const cleanGuestEmail =
+      typeof guestEmail === "string"
+        ? guestEmail.trim().toLowerCase()
+        : "";
 
-   Coral Stage 1 booking calculation:
+    const cleanSpecialRequest =
+      typeof specialRequest === "string"
+        ? specialRequest.trim()
+        : "";
 
-   rent × nights
+    if (!cleanGuestName || !cleanGuestPhone || !cleanGuestEmail) {
+      return res.status(400).json({
+        success: false,
+        message: "Guest name, phone and email are required.",
+      });
+    }
 
-   No room multiplier.
-   No automatic GST.
-   No automatic 5% tax.
-================================================= */
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanGuestEmail)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide a valid email address.",
+      });
+    }
 
-const rentPerNight =
-  Number(
-    property.rent || 0
-  );
+    if (cleanSpecialRequest.length > 1000) {
+      return res.status(400).json({
+        success: false,
+        message: "Special request cannot exceed 1000 characters.",
+      });
+    }
 
-if (
-  rentPerNight <= 0
-) {
-  return res.status(400).json({
-    success: false,
-    message:
-      "Property price is not available.",
-  });
-}
+    // Validate selection arrays
+    if (
+      !Array.isArray(sleepingArrangements) ||
+      !Array.isArray(pets)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Sleeping arrangements and pets must be arrays.",
+      });
+    }
 
-/* =================================================
-   PRICE CALCULATION
-================================================= */
+    // Only approved and active properties can be booked
+    const property = await Property.findOne({
+      _id: propertyId,
+      approvalStatus: "approved",
+      status: "active",
+    });
 
-const subtotal =
-  rentPerNight *
-  nights;
+    if (!property) {
+      return res.status(404).json({
+        success: false,
+        message: "Property is not available for booking.",
+      });
+    }
 
-const taxes = 0;
-
-const totalAmount =
-  subtotal + taxes;
-
-/* =================================================
-   CREATE BOOKING REQUEST
-
-   IMPORTANT:
-
-   status = pending
-
-   No online payment.
-   No payment processing.
-   No instant confirmation.
-================================================= */
-
-const booking =
-  await Booking.create({
-    user:
-      userId,
-
-    property:
-      propertyId,
-
-    checkIn:
-      startDate,
-
-    checkOut:
-      endDate,
-
-    guests:
-      guestCount,
-
-    pricePerNight:
-      rentPerNight,
-
-    nights:
-      nights,
-
-    subtotal:
-      subtotal,
-
-    taxes:
-      taxes,
-
-    totalAmount:
-      totalAmount,
-
-    guestName:
-      cleanGuestName,
-
-    guestPhone:
-      cleanGuestPhone,
-
-    guestEmail:
-      cleanGuestEmail,
-
-    specialRequest:
-      cleanSpecialRequest,
-
-    status:
-      "pending",
-  });
-
-/* =================================================
-   POPULATE BOOKING
-================================================= */
-
-const populatedBooking =
-  await Booking.findById(
-    booking._id
-  )
-    .populate(
-      "property"
-    )
-    .populate(
-      "user",
-      "name email phone"
+    // Guest capacity
+    const minimumGuests = Number(property.minGuests ?? 1);
+    const maximumGuests = Number(
+      property.maxGuests ?? property.guests ?? 1
     );
 
-/* =================================================
-   RESPONSE
+    if (
+      !Number.isInteger(minimumGuests) ||
+      minimumGuests < 1 ||
+      !Number.isInteger(maximumGuests) ||
+      maximumGuests < minimumGuests
+    ) {
+      return res.status(500).json({
+        success: false,
+        message: "Property guest capacity is not configured correctly.",
+      });
+    }
 
-   Important wording:
-   "Booking request submitted"
+    if (guestCount < minimumGuests) {
+      return res.status(400).json({
+        success: false,
+        message: `At least ${minimumGuests} guests are required for this property.`,
+      });
+    }
 
-   NOT:
-   "Booking confirmed"
-================================================= */
+    const extraGuestCount = Math.max(0, guestCount - maximumGuests);
+    const extraGuestPolicy = property.extraGuestPolicy || {};
 
-return res.status(201).json({
-  success: true,
+    if (extraGuestCount > 0) {
+      if (!extraGuestPolicy.enabled) {
+        return res.status(400).json({
+          success: false,
+          message: `Maximum ${maximumGuests} guests are allowed for this property.`,
+        });
+      }
 
-  message:
-    "Booking request submitted successfully. Our team will contact you for confirmation.",
+      const maxExtraGuests = Number(
+        extraGuestPolicy.maxExtraGuests ?? 0
+      );
 
-  booking:
-    populatedBooking,
-});
+      if (extraGuestCount > maxExtraGuests) {
+        return res.status(400).json({
+          success: false,
+          message: `Only ${maxExtraGuests} additional guests are allowed.`,
+        });
+      }
+    }
 
-} catch (error) {
-console.error(
-"Create booking error:",
-error
-);
+    // Only confirmed bookings block dates.
+    const overlappingBooking = await Booking.findOne({
+      property: propertyId,
+      status: "confirmed",
+      checkIn: { $lt: endDate },
+      checkOut: { $gt: startDate },
+    }).lean();
 
-return res.status(500).json({
-  success: false,
+    if (overlappingBooking) {
+      return res.status(409).json({
+        success: false,
+        message: "This property is already booked for the selected dates.",
+      });
+    }
 
-  message:
-    error.message ||
-    "Unable to create booking.",
-});
+    // Duration
+    const nights = calculateNights(startDate, endDate);
 
-}
+    if (!Number.isInteger(nights) || nights <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid booking duration.",
+      });
+    }
+
+    /*
+     * Pricing periods:
+     * perNight = number of nights
+     * perStay  = one charge for the whole booking
+     * perMonth = each started 30-night period
+     */
+    const getPeriodUnits = (period) => {
+      if (period === "perStay") return 1;
+      if (period === "perMonth") return Math.ceil(nights / 30);
+      return nights;
+    };
+
+    const roundMoney = (amount) =>
+      Math.round((amount + Number.EPSILON) * 100) / 100;
+
+    // Base rent: preserve the current Coral booking calculation.
+    const rentPerNight = Number(property.rent);
+
+    if (!Number.isFinite(rentPerNight) || rentPerNight <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Property price is not available.",
+      });
+    }
+
+    const baseAmount = roundMoney(rentPerNight * nights);
+
+    // Extra guest charge — price is read from the property, not the client.
+    let extraGuestAmount = 0;
+    let savedExtraGuestCharges = {
+      count: extraGuestCount,
+      pricePerPerson: 0,
+      chargePeriod: extraGuestPolicy.chargePeriod || "perNight",
+      amount: 0,
+    };
+
+    if (extraGuestCount > 0) {
+      const pricePerPerson = Number(
+        extraGuestPolicy.pricePerPerson ?? 0
+      );
+      const chargePeriod = extraGuestPolicy.chargePeriod || "perNight";
+
+      if (
+        !Number.isFinite(pricePerPerson) ||
+        pricePerPerson < 0 ||
+        !["perNight", "perStay", "perMonth"].includes(chargePeriod)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Extra guest pricing is configured incorrectly.",
+        });
+      }
+
+      extraGuestAmount = roundMoney(
+        extraGuestCount *
+          pricePerPerson *
+          getPeriodUnits(chargePeriod)
+      );
+
+      savedExtraGuestCharges = {
+        count: extraGuestCount,
+        pricePerPerson,
+        chargePeriod,
+        amount: extraGuestAmount,
+      };
+    }
+
+    // Sleeping arrangements — validate against owner-configured options.
+    const configuredArrangements = Array.isArray(
+      property.sleepingArrangements
+    )
+      ? property.sleepingArrangements
+      : [];
+
+    const savedSleepingArrangements = [];
+    let sleepingArrangementAmount = 0;
+    const selectedSleepingTypes = new Set();
+
+    for (const selection of sleepingArrangements) {
+      const type = selection?.type;
+      const quantity = Number(selection?.quantity);
+
+      if (
+        !type ||
+        !Number.isInteger(quantity) ||
+        quantity < 1 ||
+        selectedSleepingTypes.has(type)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid sleeping arrangement selection.",
+        });
+      }
+
+      selectedSleepingTypes.add(type);
+
+      const configured = configuredArrangements.find(
+        (item) => item.type === type
+      );
+
+      if (!configured) {
+        return res.status(400).json({
+          success: false,
+          message: `Sleeping arrangement '${type}' is not available.`,
+        });
+      }
+
+      const availableQuantity = Number(configured.quantity ?? 0);
+
+      if (quantity > availableQuantity) {
+        return res.status(400).json({
+          success: false,
+          message: `Only ${availableQuantity} unit(s) of '${type}' are available.`,
+        });
+      }
+
+      const isPaid = Boolean(configured.isPaid);
+      const pricePerUnit = Number(configured.price ?? 0);
+      const chargePeriod = configured.chargePeriod || "perStay";
+
+      if (
+        !Number.isFinite(pricePerUnit) ||
+        pricePerUnit < 0 ||
+        !["perNight", "perStay", "perMonth"].includes(chargePeriod)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: `Pricing for '${type}' is configured incorrectly.`,
+        });
+      }
+
+      const amount = isPaid
+        ? roundMoney(
+            quantity *
+              pricePerUnit *
+              getPeriodUnits(chargePeriod)
+          )
+        : 0;
+
+      sleepingArrangementAmount = roundMoney(
+        sleepingArrangementAmount + amount
+      );
+
+      savedSleepingArrangements.push({
+        type,
+        label: configured.label || "",
+        quantity,
+        pricePerUnit: isPaid ? pricePerUnit : 0,
+        chargePeriod,
+        amount,
+      });
+    }
+
+    // Pet policy — validate permission, total count and configured rates.
+    const petPolicy = property.petPolicy || {};
+    const configuredPetTypes = Array.isArray(petPolicy.types)
+      ? petPolicy.types
+      : [];
+
+    const savedPetCharges = [];
+    let petAmount = 0;
+    let totalPetCount = 0;
+    const selectedPetTypes = new Set();
+
+    if (pets.length > 0 && !petPolicy.allowed) {
+      return res.status(400).json({
+        success: false,
+        message: "Pets are not allowed at this property.",
+      });
+    }
+
+    for (const selection of pets) {
+      const type = selection?.type;
+      const count = Number(selection?.count);
+
+      if (
+        !type ||
+        !Number.isInteger(count) ||
+        count < 1 ||
+        selectedPetTypes.has(type)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid pet selection.",
+        });
+      }
+
+      selectedPetTypes.add(type);
+      totalPetCount += count;
+
+      const configuredPet = configuredPetTypes.find(
+        (item) => item.type === type
+      );
+
+      if (!configuredPet) {
+        return res.status(400).json({
+          success: false,
+          message: `Pet type '${type}' is not allowed for this property.`,
+        });
+      }
+
+      const pricePerPet = Number(configuredPet.charge ?? 0);
+      const chargePeriod = configuredPet.chargePeriod || "perStay";
+
+      if (
+        !Number.isFinite(pricePerPet) ||
+        pricePerPet < 0 ||
+        !["perNight", "perStay", "perMonth"].includes(chargePeriod)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: `Pricing for pet type '${type}' is configured incorrectly.`,
+        });
+      }
+
+      const amount = roundMoney(
+        count * pricePerPet * getPeriodUnits(chargePeriod)
+      );
+
+      petAmount = roundMoney(petAmount + amount);
+
+      savedPetCharges.push({
+        type,
+        label: configuredPet.label || "",
+        count,
+        pricePerPet,
+        chargePeriod,
+        amount,
+      });
+    }
+
+    const maxPets = Number(petPolicy.maxPets ?? 0);
+
+    if (totalPetCount > maxPets) {
+      return res.status(400).json({
+        success: false,
+        message: `Maximum ${maxPets} pet(s) are allowed at this property.`,
+      });
+    }
+
+    // Final server-calculated total. No automatic tax is applied.
+    const subtotal = roundMoney(
+      baseAmount +
+        extraGuestAmount +
+        sleepingArrangementAmount +
+        petAmount
+    );
+
+    const taxes = 0;
+    const totalAmount = roundMoney(subtotal + taxes);
+
+    // Create pending request; do not confirm or process payment automatically.
+    const booking = await Booking.create({
+      user: userId,
+      property: propertyId,
+      checkIn: startDate,
+      checkOut: endDate,
+      guests: guestCount,
+      pricePerNight: rentPerNight,
+      nights,
+      baseAmount,
+      extraGuestCharges: savedExtraGuestCharges,
+      sleepingArrangementCharges: savedSleepingArrangements,
+      petCharges: savedPetCharges,
+      subtotal,
+      taxes,
+      totalAmount,
+      guestName: cleanGuestName,
+      guestPhone: cleanGuestPhone,
+      guestEmail: cleanGuestEmail,
+      specialRequest: cleanSpecialRequest,
+      status: "pending",
+    });
+
+    const populatedBooking = await Booking.findById(booking._id)
+      .populate("property")
+      .populate("user", "name email phone");
+
+    return res.status(201).json({
+      success: true,
+      message:
+        "Booking request submitted successfully. Our team will contact you for confirmation.",
+      booking: populatedBooking,
+    });
+  } catch (error) {
+    console.error("Create booking error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to create booking.",
+    });
+  }
 };
 
 /* =====================================================
