@@ -533,7 +533,11 @@ export const createProperty = async (req, res) => {
     /* ================================================
        CREATE PROPERTY
     ================================================ */
-
+console.log("CREATE PROPERTY BODY:", req.body);
+console.log("MIN GUESTS:", req.body.minGuests);
+console.log("EXTRA POLICY:", req.body.extraGuestPolicy);
+console.log("SLEEPING:", req.body.sleepingArrangements);
+console.log("PET POLICY:", req.body.petPolicy);
     const property = await Property.create({
       /* OWNER */
       owner: req.user._id,
