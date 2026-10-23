@@ -4,6 +4,7 @@ import {
   adminLogin,
   getAdminMe,
   adminLogout,
+  getRegisteredClients,
 } from "../controllers/adminController.js";
 
 import {
