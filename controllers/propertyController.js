@@ -1078,15 +1078,12 @@ export const updateProperty = async (req, res) => {
        OWNER CHECK
     ================================================ */
 
-    if (
-      !req.user?._id ||
-      property.owner.toString() !== req.user._id.toString()
-    ) {
-      return res.status(403).json({
-        success: false,
-        message: "You are not allowed to edit this property.",
-      });
-    }
+    if (!req.admin?._id) {
+  return res.status(401).json({
+    success: false,
+    message: "Admin authentication required.",
+  });
+}
 
     /* ================================================
        REQUEST BODY
@@ -1621,15 +1618,10 @@ if (!property) {
    OWNER CHECK
 ================================================= */
 
-if (
-  property.owner.toString() !==
-  req.user._id.toString()
-) {
-  return res.status(403).json({
+if (!req.admin?._id) {
+  return res.status(401).json({
     success: false,
-
-    message:
-      "You are not allowed to delete this property.",
+    message: "Admin authentication required.",
   });
 }
 
