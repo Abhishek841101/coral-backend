@@ -54,10 +54,17 @@ router.post(
   protectAdmin,
   adminLogout
 );
+/* =====================================================
+   REGISTERED CLIENTS
+   GET /api/admin/clients
+===================================================== */
 
-import {
-  getRegisteredClients,
-} from "../controllers/adminController.js";
+router.get(
+  "/clients",
+  protectAdmin,
+  getRegisteredClients
+);
+
 /* =====================================================
    PROPERTY STATS
 
