@@ -197,128 +197,128 @@
 
 
 
-import jwt from "jsonwebtoken";
-import User from "../models/User.js";
+  import jwt from "jsonwebtoken";
+  import User from "../models/User.js";
 
-/* =====================================================
-USER PROTECT
+  /* =====================================================
+  USER PROTECT
 
-Customer authentication:
+  Customer authentication:
 
-* Reads coral_token cookie
-* Verifies JWT
-* Checks active user
-* Attaches user to req.user
+  * Reads coral_token cookie
+  * Verifies JWT
+  * Checks active user
+  * Attaches user to req.user
 
-IMPORTANT:
-Existing customer auth/cookie behavior is preserved.
-===================================================== */
+  IMPORTANT:
+  Existing customer auth/cookie behavior is preserved.
+  ===================================================== */
 
-export const protect = async (req, res, next) => {
-try {
-const token = req.cookies?.coral_token;
+  export const protect = async (req, res, next) => {
+  try {
+  const token = req.cookies?.coral_token;
 
 
-if (!token) {
-  return res.status(401).json({
-    success: false,
-    message: "Authentication required. Please login.",
-  });
-}
+  if (!token) {
+    return res.status(401).json({
+      success: false,
+      message: "Authentication required. Please login.",
+    });
+  }
 
-const decoded = jwt.verify(
-  token,
-  process.env.JWT_SECRET
-);
+  const decoded = jwt.verify(
+    token,
+    process.env.JWT_SECRET
+  );
 
-if (!decoded?.id) {
+  if (!decoded?.id) {
+    return res.status(401).json({
+      success: false,
+      message: "Invalid authentication token.",
+    });
+  }
+
+  const user = await User.findById(decoded.id);
+
+  if (!user) {
+    return res.status(401).json({
+      success: false,
+      message: "User account no longer exists.",
+    });
+  }
+
+  if (!user.isActive) {
+    return res.status(403).json({
+      success: false,
+      message: "Your account has been disabled.",
+    });
+  }
+
+  req.user = user;
+
+  next();
+
+
+  } catch (error) {
+  console.error(
+  "Authentication error:",
+  error.message
+  );
+
+  if (error.name === "TokenExpiredError") {
+    return res.status(401).json({
+      success: false,
+      message: "Session expired. Please login again.",
+    });
+  }
+
+  if (error.name === "JsonWebTokenError") {
+    return res.status(401).json({
+      success: false,
+      message: "Invalid authentication token.",
+    });
+  }
+
+  if (error.name === "NotBeforeError") {
+    return res.status(401).json({
+      success: false,
+      message: "Authentication is not active yet.",
+    });
+  }
+
   return res.status(401).json({
     success: false,
     message: "Invalid authentication token.",
   });
-}
 
-const user = await User.findById(decoded.id);
+  }
+  };
 
-if (!user) {
+  /* =====================================================
+  ADMIN ONLY
+
+  Use after protect() when an authenticated user
+  must specifically be an admin.
+
+  NOTE:
+  Admin routes that use Bearer token should continue
+  using protectAdmin from adminAuthMiddleware.js.
+  ===================================================== */
+
+  export const adminOnly = (req, res, next) => {
+  if (!req.user) {
   return res.status(401).json({
-    success: false,
-    message: "User account no longer exists.",
-  });
-}
-
-if (!user.isActive) {
-  return res.status(403).json({
-    success: false,
-    message: "Your account has been disabled.",
-  });
-}
-
-req.user = user;
-
-next();
-
-
-} catch (error) {
-console.error(
-"Authentication error:",
-error.message
-);
-
-if (error.name === "TokenExpiredError") {
-  return res.status(401).json({
-    success: false,
-    message: "Session expired. Please login again.",
-  });
-}
-
-if (error.name === "JsonWebTokenError") {
-  return res.status(401).json({
-    success: false,
-    message: "Invalid authentication token.",
-  });
-}
-
-if (error.name === "NotBeforeError") {
-  return res.status(401).json({
-    success: false,
-    message: "Authentication is not active yet.",
-  });
-}
-
-return res.status(401).json({
   success: false,
-  message: "Invalid authentication token.",
-});
+  message: "Authentication required.",
+  });
+  }
 
-}
-};
+  if (req.user.role !== "admin") {
+  return res.status(403).json({
+  success: false,
+  message: "Admin access required.",
+  });
+  }
 
-/* =====================================================
-ADMIN ONLY
-
-Use after protect() when an authenticated user
-must specifically be an admin.
-
-NOTE:
-Admin routes that use Bearer token should continue
-using protectAdmin from adminAuthMiddleware.js.
-===================================================== */
-
-export const adminOnly = (req, res, next) => {
-if (!req.user) {
-return res.status(401).json({
-success: false,
-message: "Authentication required.",
-});
-}
-
-if (req.user.role !== "admin") {
-return res.status(403).json({
-success: false,
-message: "Admin access required.",
-});
-}
-
-next();
-};
+  next();
+  };

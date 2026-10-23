@@ -2,7 +2,7 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
-
+import LoginHistory from "../models/LoginHistory.js";
 /* =====================================================
    CREATE JWT
 ===================================================== */
@@ -262,9 +262,15 @@ export const login = async (req, res) => {
        UPDATE LAST LOGIN
     ================================================= */
 
-    user.lastLogin = new Date();
+   // Update latest login time
+user.lastLogin = new Date();
+await user.save();
 
-    await user.save();
+// Save separate login history record
+await LoginHistory.create({
+  user: user._id,
+  loginAt: new Date(),
+});
 
     /* =================================================
        CREATE JWT

@@ -55,6 +55,9 @@ router.post(
   adminLogout
 );
 
+import {
+  getRegisteredClients,
+} from "../controllers/adminController.js";
 /* =====================================================
    PROPERTY STATS
 

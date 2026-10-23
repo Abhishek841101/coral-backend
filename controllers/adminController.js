@@ -195,3 +195,34 @@ export const adminLogout = async (req, res) => {
     });
   }
 };
+
+/* =====================================================
+   GET ALL REGISTERED CLIENTS
+   GET /api/admin/clients
+===================================================== */
+
+export const getRegisteredClients = async (req, res) => {
+  try {
+    const clients = await User.find({
+      role: "user",
+    })
+      .select(
+        "name email phone avatar isActive createdAt lastLogin"
+      )
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      total: clients.length,
+      clients,
+    });
+  } catch (error) {
+    console.error("Get registered clients error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to fetch registered clients.",
+    });
+  }
+};
