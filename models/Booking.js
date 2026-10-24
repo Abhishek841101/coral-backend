@@ -79,30 +79,46 @@ const petChargeSchema = new mongoose.Schema(
       enum: ["dog", "cat", "bird", "rabbit", "other"],
       required: true,
     },
+
     label: {
       type: String,
-      default: "",
       trim: true,
+      default: "",
+      maxlength: 100,
     },
+
+    customName: {
+      type: String,
+      trim: true,
+      default: "",
+      maxlength: 100,
+    },
+
     count: {
       type: Number,
       required: true,
       min: 1,
     },
+
     pricePerPet: {
       type: Number,
-      default: 0,
+      required: true,
       min: 0,
+      default: 0,
     },
+
     chargePeriod: {
       type: String,
-      enum: chargePeriods,
+      enum: ["perNight", "perStay", "perMonth"],
+      required: true,
       default: "perStay",
     },
+
     amount: {
       type: Number,
       required: true,
       min: 0,
+      default: 0,
     },
   },
   { _id: false }
@@ -171,11 +187,10 @@ const bookingSchema = new mongoose.Schema(
     },
 
     // Selected pets and their charges.
-    petCharges: {
-      type: [petChargeSchema],
-      default: [],
-    },
-
+   petCharges: {
+  type: [petChargeSchema],
+  default: [],
+},
     // Base rent + extra guest + sleeping arrangement + pet charges.
     subtotal: {
       type: Number,

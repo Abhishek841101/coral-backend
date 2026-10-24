@@ -256,6 +256,7 @@ const parseSleepingArrangements = (value) => {
   });
 };
 
+
 const parsePetPolicy = (value, existing = {}) => {
   const data = {
     ...existing,
@@ -264,7 +265,31 @@ const parsePetPolicy = (value, existing = {}) => {
 
   const allowed = parseBoolean(data.allowed, false);
   const maxPets = toIntegerOrNull(data.maxPets ?? 0);
-  const types = parseArray(data.types);
+
+  // Support old property records during migration.
+  const legacyTypes = parseArray(data.types);
+  const firstLegacyPet = parseObject(legacyTypes[0]);
+
+  const rawCharge =
+    data.charge !== undefined &&
+    data.charge !== null &&
+    data.charge !== ""
+      ? data.charge
+      : firstLegacyPet.charge ?? 0;
+
+  const charge = parseNonNegativeNumber(
+    rawCharge,
+    "Pet charge"
+  );
+
+  const chargePeriod =
+    data.chargePeriod ??
+    firstLegacyPet.chargePeriod ??
+    "perNight";
+
+  if (!CHARGE_PERIODS.includes(chargePeriod)) {
+    throw new Error("Invalid pet charge period.");
+  }
 
   if (maxPets === null || maxPets < 0) {
     throw new Error("Maximum pets cannot be negative.");
@@ -274,50 +299,29 @@ const parsePetPolicy = (value, existing = {}) => {
     return {
       allowed: false,
       maxPets: 0,
+      charge: 0,
+      chargePeriod: "perNight",
       types: [],
     };
   }
 
   if (maxPets < 1) {
-    throw new Error("Maximum pets must be at least 1 when pets are allowed.");
-  }
-
-  const parsedTypes = types.map((item, index) => {
-    const pet = parseObject(item);
-
-    if (!PET_TYPES.includes(pet.type)) {
-      throw new Error(`Invalid pet type at item ${index + 1}.`);
-    }
-
-    const charge = parseNonNegativeNumber(
-      pet.charge ?? 0,
-      "Pet charge"
+    throw new Error(
+      "Maximum pets must be at least 1 when pets are allowed."
     );
-
-    const chargePeriod = pet.chargePeriod ?? "perStay";
-
-    if (!CHARGE_PERIODS.includes(chargePeriod)) {
-      throw new Error("Invalid pet charge period.");
-    }
-
-    return {
-      type: pet.type,
-      label: String(pet.label ?? pet.type).trim(),
-      charge,
-      chargePeriod,
-    };
-  });
-
-  if (parsedTypes.length === 0) {
-    throw new Error("Select at least one pet type.");
   }
 
   return {
     allowed: true,
     maxPets,
-    types: parsedTypes,
+    charge,
+    chargePeriod,
+
+    // Retained temporarily for compatibility.
+    types: legacyTypes,
   };
 };
+
 
 /* =====================================================
 CREATE PROPERTY

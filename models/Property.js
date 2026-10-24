@@ -365,23 +365,43 @@ const propertySchema = new mongoose.Schema(
        Each pet type can have its own charge.
     ===================================================== */
 
-    petPolicy: {
-      allowed: {
-        type: Boolean,
-        default: false,
-      },
+    
+/* =====================================================
+   PET POLICY
+   One common charge for all pet types
+===================================================== */
 
-      maxPets: {
-        type: Number,
-        min: 0,
-        default: 0,
-      },
+petPolicy: {
+  allowed: {
+    type: Boolean,
+    default: false,
+  },
 
-      types: {
-        type: [petTypeSchema],
-        default: [],
-      },
-    },
+  maxPets: {
+    type: Number,
+    min: 0,
+    default: 0,
+  },
+
+  charge: {
+    type: Number,
+    min: 0,
+    default: 0,
+  },
+
+  chargePeriod: {
+    type: String,
+    enum: chargePeriods,
+    default: "perNight",
+  },
+
+  // Legacy compatibility for existing properties.
+  // New pet pricing will not use this field.
+  types: {
+    type: [petTypeSchema],
+    default: [],
+  },
+},
 
     /* =====================================================
        AMENITIES
