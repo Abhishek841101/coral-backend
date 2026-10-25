@@ -1450,19 +1450,25 @@ export const createBooking = async (req, res) => {
       totalPetCount += count;
 
       // All supported pet types use the property's common pet pricing.
-const pricePerPet = Number(petPolicy.price ?? 0);
-const chargePeriod = petPolicy.chargePeriod || "perStay";
 
-if (
-  !Number.isFinite(pricePerPet) ||
-  pricePerPet < 0 ||
-  !["perNight", "perStay", "perMonth"].includes(chargePeriod)
-) {
-  return res.status(400).json({
-    success: false,
-    message: "Pet pricing is configured incorrectly.",
-  });
-}
+      // Pet pricing: support current and legacy property records
+      const legacyPetType = Array.isArray(petPolicy.types)
+        ? petPolicy.types.find((item) => Number(item?.charge) > 0)
+        : null;
+
+      const rawPetPrice =
+        Number(petPolicy.charge) > 0
+          ? petPolicy.charge
+          : Number(petPolicy.price) > 0
+            ? petPolicy.price
+            : legacyPetType?.charge ?? 0;
+
+      const pricePerPet = Number(rawPetPrice);
+
+      const chargePeriod =
+        petPolicy.chargePeriod ||
+        legacyPetType?.chargePeriod ||
+        "perStay";
 
 const amount = roundMoney(
   count * pricePerPet * getPeriodUnits(chargePeriod)
