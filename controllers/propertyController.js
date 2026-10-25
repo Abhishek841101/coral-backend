@@ -1499,30 +1499,70 @@ export const updateProperty = async (req, res) => {
        OPTIONAL NEW IMAGES
     ================================================ */
 
-    if (Array.isArray(req.files) && req.files.length > 0) {
-      for (const file of req.files) {
-        try {
-          const result = await uploadToCloudinary(file.buffer);
+    /* ================================================
+   UPDATE PROPERTY IMAGES
+================================================ */
 
-          property.images.push({
-            url: result.secure_url,
-            publicId: result.public_id,
-            isPrimary: property.images.length === 0,
-          });
-        } catch (uploadError) {
-          console.error(
-            "Cloudinary upload error:",
-            uploadError
-          );
+// Existing images sent by frontend after removing
+// unwanted images using cross button
+let retainedImages = property.images || [];
 
-          return res.status(500).json({
-            success: false,
-            message: "Unable to upload property image.",
-          });
-        }
-      }
+if (body.existingImages !== undefined) {
+  try {
+    retainedImages = JSON.parse(body.existingImages);
+
+    if (!Array.isArray(retainedImages)) {
+      return res.status(400).json({
+        success: false,
+        message: "existingImages must be an array.",
+      });
     }
+  } catch {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid existingImages format.",
+    });
+  }
+}
 
+// Only allow images that already belong to this property
+const currentImages = property.images || [];
+
+const allowedImages = retainedImages
+  .map((image) => {
+    const url = typeof image === "string" ? image : image?.url;
+
+    return currentImages.find((oldImage) => oldImage.url === url);
+  })
+  .filter(Boolean);
+
+// Upload newly selected images
+const uploadedImages = [];
+
+if (Array.isArray(req.files) && req.files.length > 0) {
+  for (const file of req.files) {
+    const result = await uploadToCloudinary(file.buffer);
+
+    uploadedImages.push({
+      url: result.secure_url,
+      publicId: result.public_id,
+      isPrimary: false,
+    });
+  }
+}
+
+// Replace array: removed URLs will no longer be saved
+property.images = [...allowedImages, ...uploadedImages];
+
+// Ensure one primary image if images remain
+if (property.images.length > 0) {
+  property.images = property.images.map((image, index) => ({
+    ...image.toObject?.(),
+    url: image.url,
+    publicId: image.publicId,
+    isPrimary: index === 0,
+  }));
+}
     /* ================================================
        LEGACY GUEST CAPACITY COMPATIBILITY
     ================================================ */
