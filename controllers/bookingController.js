@@ -1479,36 +1479,7 @@ savedPetCharges.push({
   chargePeriod,
   amount,
 });
-      if (
-        !Number.isFinite(pricePerPet) ||
-        pricePerPet < 0 ||
-        !["perNight", "perStay", "perMonth"].includes(chargePeriod)
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: `Pricing for pet type '${type}' is configured incorrectly.`,
-        });
       }
-
-      const amount = roundMoney(
-        count * pricePerPet * getPeriodUnits(chargePeriod)
-      );
-
-      petAmount = roundMoney(petAmount + amount);
-
-      savedPetCharges.push({
-        type,
-        label:
-          type === "other"
-            ? customName
-            : configuredPet.label || type,
-        customName: type === "other" ? customName : "",
-        count,
-        pricePerPet,
-        chargePeriod,
-        amount,
-      });
-    }
 
     const maxPets = Number(petPolicy.maxPets ?? 0);
 
