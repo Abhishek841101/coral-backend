@@ -266,30 +266,13 @@ const parsePetPolicy = (value, existing = {}) => {
   const allowed = parseBoolean(data.allowed, false);
   const maxPets = toIntegerOrNull(data.maxPets ?? 0);
 
-  // Support old property records during migration.
-  const legacyTypes = parseArray(data.types);
-  const firstLegacyPet = parseObject(legacyTypes[0]);
-
-  const rawCharge =
-    data.charge !== undefined &&
-    data.charge !== null &&
-    data.charge !== ""
-      ? data.charge
-      : firstLegacyPet.charge ?? 0;
-
+  // Support both new and legacy field names.
   const charge = parseNonNegativeNumber(
-    rawCharge,
+    data.charge ?? data.price ?? 0,
     "Pet charge"
   );
 
-  const chargePeriod =
-    data.chargePeriod ??
-    firstLegacyPet.chargePeriod ??
-    "perNight";
-
-  if (!CHARGE_PERIODS.includes(chargePeriod)) {
-    throw new Error("Invalid pet charge period.");
-  }
+  const chargePeriod = data.chargePeriod ?? "perStay";
 
   if (maxPets === null || maxPets < 0) {
     throw new Error("Maximum pets cannot be negative.");
@@ -300,7 +283,7 @@ const parsePetPolicy = (value, existing = {}) => {
       allowed: false,
       maxPets: 0,
       charge: 0,
-      chargePeriod: "perNight",
+      chargePeriod,
       types: [],
     };
   }
@@ -311,17 +294,18 @@ const parsePetPolicy = (value, existing = {}) => {
     );
   }
 
+  if (!CHARGE_PERIODS.includes(chargePeriod)) {
+    throw new Error("Invalid pet charge period.");
+  }
+
   return {
     allowed: true,
     maxPets,
     charge,
     chargePeriod,
-
-    // Retained temporarily for compatibility.
-    types: legacyTypes,
+    types: [],
   };
 };
-
 
 /* =====================================================
 CREATE PROPERTY
