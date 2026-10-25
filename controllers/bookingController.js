@@ -1391,9 +1391,7 @@ export const createBooking = async (req, res) => {
     }
 
     const petPolicy = property.petPolicy || {};
-    const configuredPetTypes = Array.isArray(petPolicy.types)
-      ? petPolicy.types
-      : [];
+    
 
     const supportedPetTypes = new Set([
       "dog",
@@ -1451,22 +1449,36 @@ export const createBooking = async (req, res) => {
       selectedPetTypes.add(type);
       totalPetCount += count;
 
-      const configuredPet = configuredPetTypes.find(
-        (item) =>
-          String(item?.type || "").trim().toLowerCase() === type
-      );
+      // All supported pet types use the property's common pet pricing.
+const pricePerPet = Number(petPolicy.price ?? 0);
+const chargePeriod = petPolicy.chargePeriod || "perStay";
 
-      if (!configuredPet) {
-        return res.status(400).json({
-          success: false,
-          message: `Pet type '${type}' is not allowed for this property.`,
-        });
-      }
+if (
+  !Number.isFinite(pricePerPet) ||
+  pricePerPet < 0 ||
+  !["perNight", "perStay", "perMonth"].includes(chargePeriod)
+) {
+  return res.status(400).json({
+    success: false,
+    message: "Pet pricing is configured incorrectly.",
+  });
+}
 
-      // Always use the price configured by the property owner.
-      const pricePerPet = Number(configuredPet.charge ?? 0);
-      const chargePeriod = configuredPet.chargePeriod || "perStay";
+const amount = roundMoney(
+  count * pricePerPet * getPeriodUnits(chargePeriod)
+);
 
+petAmount = roundMoney(petAmount + amount);
+
+savedPetCharges.push({
+  type,
+  label: type === "other" ? customName : type,
+  customName: type === "other" ? customName : "",
+  count,
+  pricePerPet,
+  chargePeriod,
+  amount,
+});
       if (
         !Number.isFinite(pricePerPet) ||
         pricePerPet < 0 ||
